@@ -33,6 +33,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📖 Welcome to your Diary Bot!\n\n"
         "Send me any message — text, photo, video, or album — and I'll help you log it with a mood.\n\n"
         "Commands:\n"
+        "/list — Browse your entries\n"
+        "/search <text> — Search your diary\n"
         "/edit — Edit a past entry\n"
         "/delete — Delete a past entry\n"
         "/import YYYY-MM-DD — Import a past entry\n"
@@ -397,6 +399,158 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Mood breakdown:\n" + "\n".join(mood_lines if mood_lines else ["  No data yet"])
     )
     await update.message.reply_text(text)
+
+
+# ── /list ───────────────────────────────────────────────
+
+async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    now = get_now()
+    entries = await db.get_entries_page(now.year, now.month, limit=10)
+
+    if not entries:
+        await update.message.reply_text("No entries this month.")
+        return
+
+    context.user_data["list_year"] = now.year
+    context.user_data["list_month"] = now.month
+    context.user_data["list_offset"] = 10
+
+    keyboard = _build_entry_buttons(entries)
+    keyboard.append([InlineKeyboardButton(" older entries ▼", callback_data="listmore")])
+
+    await update.message.reply_text(
+        f"📖 {now.strftime('%B %Y')} — {len(entries)} entries",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+async def list_more_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    year = context.user_data.get("list_year")
+    month = context.user_data.get("list_month")
+    offset = context.user_data.get("list_offset", 0)
+
+    entries = await db.get_entries_page(year, month, limit=10, offset=offset)
+
+    if not entries:
+        older = await db.get_entries_before(year, month, limit=10)
+        if not older:
+            await query.edit_message_text("No more entries.")
+            return
+
+        context.user_data["list_year"] = older[0]["created_at"][:4]
+        context.user_data["list_month"] = int(older[0]["created_at"][5:7])
+        context.user_data["list_offset"] = 10
+
+        keyboard = _build_entry_buttons(older)
+        keyboard.append([InlineKeyboardButton(" older entries ▼", callback_data="listmore")])
+
+        await query.edit_message_text(
+            f"📖 Older entries — {len(older)} shown",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return
+
+    context.user_data["list_offset"] = offset + 10
+
+    keyboard = _build_entry_buttons(entries)
+    keyboard.append([InlineKeyboardButton(" older entries ▼", callback_data="listmore")])
+
+    await query.edit_message_text(
+        f"📖 More entries — {len(entries)} shown",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+def _build_entry_buttons(entries: list[dict]) -> list[list[InlineKeyboardButton]]:
+    return [
+        [InlineKeyboardButton(
+            f"{e['mood']} {e['created_at'][:10]} — {e['thought'][:40]}{'...' if len(e['thought']) > 40 else ''}",
+            callback_data=f"view:{e['id']}",
+        )]
+        for e in entries
+    ]
+
+
+async def view_entry_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    entry_id = int(query.data.split(":", 1)[1])
+    entry = await db.get_entry(entry_id)
+    if not entry:
+        await query.edit_message_text("Entry not found.")
+        return
+
+    text = format_entry(
+        datetime.fromisoformat(entry["created_at"]).replace(tzinfo=ZoneInfo(TIMEZONE)),
+        entry["mood"],
+        entry["thought"],
+    )
+
+    if entry["message_id"]:
+        try:
+            await query.message.reply_text(text, reply_to_message_id=entry["message_id"])
+        except Exception:
+            await query.message.reply_text(text)
+    else:
+        await query.message.reply_text(text)
+
+
+# ── /search ─────────────────────────────────────────────
+
+async def cmd_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query_text = " ".join(context.args) if context.args else ""
+    if not query_text:
+        await update.message.reply_text("Usage: /search <text>")
+        return
+
+    entries = await db.search_entries(query_text, limit=20)
+    if not entries:
+        await update.message.reply_text(f'No entries matching "{query_text}".')
+        return
+
+    context.user_data["search_entries"] = {e["id"]: e for e in entries}
+
+    keyboard = [
+        [InlineKeyboardButton(
+            f"{e['mood']} {e['created_at'][:10]} — {e['thought'][:40]}{'...' if len(e['thought']) > 40 else ''}",
+            callback_data=f"srch:{e['id']}",
+        )]
+        for e in entries
+    ]
+
+    await update.message.reply_text(
+        f'🔍 {len(entries)} result(s) for "{query_text}"',
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+async def search_result_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    entry_id = int(query.data.split(":", 1)[1])
+    entry = await db.get_entry(entry_id)
+    if not entry:
+        await query.edit_message_text("Entry not found.")
+        return
+
+    text = format_entry(
+        datetime.fromisoformat(entry["created_at"]).replace(tzinfo=ZoneInfo(TIMEZONE)),
+        entry["mood"],
+        entry["thought"],
+    )
+
+    if entry["message_id"]:
+        try:
+            await query.message.reply_text(text, reply_to_message_id=entry["message_id"])
+        except Exception:
+            await query.message.reply_text(text)
+    else:
+        await query.message.reply_text(text)
 
 
 # ── Memory (called by scheduler) ────────────────────────

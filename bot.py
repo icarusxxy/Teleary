@@ -29,6 +29,11 @@ from handlers import (
     settings_select_callback,
     settings_value_receive,
     cmd_stats,
+    cmd_list,
+    list_more_callback,
+    view_entry_callback,
+    cmd_search,
+    search_result_callback,
     MOOD_PICK,
     EDIT_SELECT,
     EDIT_MOOD,
@@ -109,6 +114,11 @@ def main():
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("stats", cmd_stats))
+    app.add_handler(CommandHandler("list", cmd_list))
+    app.add_handler(CommandHandler("search", cmd_search))
+    app.add_handler(CallbackQueryHandler(list_more_callback, pattern=r"^listmore$"))
+    app.add_handler(CallbackQueryHandler(view_entry_callback, pattern=r"^view:"))
+    app.add_handler(CallbackQueryHandler(search_result_callback, pattern=r"^srch:"))
     app.add_handler(entry_conv)
     app.add_handler(edit_conv)
     app.add_handler(delete_conv)

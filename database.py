@@ -68,6 +68,36 @@ async def get_recent_entries(limit: int = 10) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+async def get_entries_page(year: int, month: int, limit: int = 10, offset: int = 0) -> list[dict]:
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT * FROM entries WHERE strftime('%Y-%m', created_at) = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        (f"{year}-{month:02d}", limit, offset),
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_entries_before(year: int, month: int, limit: int = 10, offset: int = 0) -> list[dict]:
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT * FROM entries WHERE created_at < ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        (f"{year}-{month:02d}-01", limit, offset),
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def search_entries(query: str, limit: int = 20) -> list[dict]:
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT * FROM entries WHERE thought LIKE ? ORDER BY created_at DESC LIMIT ?",
+        (f"%{query}%", limit),
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
 async def update_entry(entry_id: int, mood: str | None = None, thought: str | None = None):
     db = await get_db()
     sets, vals = [], []
