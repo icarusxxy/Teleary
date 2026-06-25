@@ -135,7 +135,7 @@ async def get_entries_on_this_day(month: int, day: int) -> list[dict]:
     now = datetime.now(tz)
     db = await get_db()
     cursor = await db.execute(
-        "SELECT * FROM entries WHERE strftime('%%m', created_at) = ? AND strftime('%%d', created_at) = ?",
+        "SELECT * FROM entries WHERE strftime('%m', created_at) = ? AND strftime('%d', created_at) = ?",
         (f"{month:02d}", f"{day:02d}"),
     )
     rows = await cursor.fetchall()
@@ -156,7 +156,7 @@ async def get_stats() -> dict:
 
     now = datetime.now(ZoneInfo(TIMEZONE))
     cursor = await db.execute(
-        "SELECT COUNT(*) FROM entries WHERE strftime('%%Y-%m', created_at) = ?",
+        "SELECT COUNT(*) FROM entries WHERE strftime('%Y-%m', created_at) = ?",
         (now.strftime("%Y-%m"),),
     )
     this_month = (await cursor.fetchone())[0]
