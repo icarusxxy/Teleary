@@ -309,6 +309,8 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def import_text_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from loguru import logger
+    logger.debug(f"import_text_receive: import_date={context.user_data.get('import_date')}")
     context.user_data["import_text"] = update.message.text
     keyboard = [[InlineKeyboardButton(m, callback_data=f"imood:{m}")] for m in MOODS]
     keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
@@ -330,13 +332,22 @@ async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     tz = ZoneInfo(TIMEZONE)
     dt = datetime(target_date.year, target_date.month, target_date.day, 12, 0, tzinfo=tz)
+    dt_utc = dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+
+    from loguru import logger
+    logger.debug(f"Import: target_date={target_date}, dt={dt}, dt_utc={dt_utc}, iso={dt_utc.isoformat()}")
 
     db_conn = await db.get_db()
     cursor = await db_conn.execute(
         "INSERT INTO entries (mood, thought, created_at) VALUES (?, ?, ?)",
-        (mood, text, dt.isoformat()),
+        (mood, text, dt_utc.strftime("%Y-%m-%d %H:%M:%S")),
     )
     await db_conn.commit()
+
+    # verify what was stored
+    row = await db_conn.execute("SELECT created_at FROM entries WHERE id = ?", (cursor.lastrowid,))
+    stored = await row.fetchone()
+    logger.debug(f"Import: stored created_at = {stored[0] if stored else 'N/A'}")
 
     label = MOOD_LABELS.get(mood, "")
     await query.edit_message_text(f"✓ Imported! {mood} {label} — {target_date.isoformat()}")

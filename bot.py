@@ -140,11 +140,11 @@ def main():
     app.add_handler(CallbackQueryHandler(list_more_callback, pattern=r"^listmore$"))
     app.add_handler(CallbackQueryHandler(view_entry_callback, pattern=r"^view:"))
     app.add_handler(CallbackQueryHandler(search_result_callback, pattern=r"^srch:"))
-    app.add_handler(entry_conv)
+    app.add_handler(import_conv)
     app.add_handler(edit_conv)
     app.add_handler(delete_conv)
-    app.add_handler(import_conv)
     app.add_handler(settings_conv)
+    app.add_handler(entry_conv)
 
     app.post_init = post_init
     app.post_shutdown = post_shutdown
