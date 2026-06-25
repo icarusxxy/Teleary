@@ -312,6 +312,7 @@ async def import_text_receive(update: Update, context: ContextTypes.DEFAULT_TYPE
     from loguru import logger
     logger.debug(f"import_text_receive: import_date={context.user_data.get('import_date')}")
     context.user_data["import_text"] = update.message.text
+    context.user_data["import_message_id"] = update.message.message_id
     keyboard = [[InlineKeyboardButton(m, callback_data=f"imood:{m}")] for m in MOODS]
     keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
     await update.message.reply_text("Pick a mood:", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -337,10 +338,12 @@ async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     from loguru import logger
     logger.debug(f"Import: target_date={target_date}, dt={dt}, dt_utc={dt_utc}, iso={dt_utc.isoformat()}")
 
+    message_id = context.user_data.get("import_message_id")
+
     db_conn = await db.get_db()
     cursor = await db_conn.execute(
-        "INSERT INTO entries (mood, thought, created_at) VALUES (?, ?, ?)",
-        (mood, text, dt_utc.strftime("%Y-%m-%d %H:%M:%S")),
+        "INSERT INTO entries (message_id, mood, thought, created_at) VALUES (?, ?, ?, ?)",
+        (message_id, mood, text, dt_utc.strftime("%Y-%m-%d %H:%M:%S")),
     )
     await db_conn.commit()
 
@@ -461,7 +464,22 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     entries = await db.get_entries_page(now.year, now.month, limit=10)
 
     if not entries:
-        await update.message.reply_text("No entries this month.")
+        older = await db.get_entries_before(now.year, now.month, limit=10)
+        if not older:
+            await update.message.reply_text("No diary entries yet.")
+            return
+
+        context.user_data["list_year"] = older[0]["created_at"][:4]
+        context.user_data["list_month"] = int(older[0]["created_at"][5:7])
+        context.user_data["list_offset"] = 10
+
+        keyboard = _build_entry_buttons(older)
+        keyboard.append([InlineKeyboardButton(" older entries ▼", callback_data="listmore")])
+
+        await update.message.reply_text(
+            f"📖 Older entries — {len(older)} shown",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
         return
 
     context.user_data["list_year"] = now.year
