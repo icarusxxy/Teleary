@@ -21,8 +21,23 @@ MOOD_PICK, ENTRY_TEXT, EDIT_SELECT, EDIT_MOOD, EDIT_TEXT = range(5)
 IMPORT_DATE, IMPORT_MOOD = range(5, 7)
 SETTINGS_SELECT, SETTINGS_VALUE = range(7, 9)
 
+CANCEL = "cancel"
+
 _media_group_buffers: dict[str, list] = {}
 _media_group_locks: dict[str, asyncio.Event] = {}
+
+
+def _cancel_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)]])
+
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text("Cancelled.")
+    else:
+        await update.message.reply_text("Cancelled.")
+    return ConversationHandler.END
 
 
 # ── /start ──────────────────────────────────────────────
@@ -58,6 +73,7 @@ async def receive_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["pending_message_id"] = msg.message_id
 
     keyboard = [[InlineKeyboardButton(m, callback_data=f"mood:{m}")] for m in MOODS]
+    keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
     await msg.reply_text(
         "How are you feeling?",
         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -93,6 +109,7 @@ async def _handle_media_group(update: Update, context: ContextTypes.DEFAULT_TYPE
         context.user_data["pending_media_group_ids"] = message_ids
 
         keyboard = [[InlineKeyboardButton(m, callback_data=f"mood:{m}")] for m in MOODS]
+        keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
         await first_msg.reply_text(
             f"📸 Album with {len(messages)} items received. How are you feeling?",
             reply_markup=InlineKeyboardMarkup(keyboard),
@@ -134,6 +151,7 @@ async def cmd_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )]
         for e in entries
     ]
+    keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
     await update.message.reply_text(
         "Which entry do you want to edit?",
         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -145,6 +163,10 @@ async def edit_select_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
 
+    if query.data == CANCEL:
+        await query.edit_message_text("Cancelled.")
+        return ConversationHandler.END
+
     entry_id = int(query.data.split(":", 1)[1])
     entry = await db.get_entry(entry_id)
     if not entry:
@@ -154,6 +176,7 @@ async def edit_select_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     context.user_data["editing_entry"] = entry
     keyboard = [[InlineKeyboardButton(m, callback_data=f"emood:{m}")] for m in MOODS]
     keyboard.append([InlineKeyboardButton("Keep current", callback_data="emood:keep")])
+    keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
     await query.edit_message_text(
         f"Current: {entry['mood']} {entry['thought']}\n\nPick a new mood:",
         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -165,6 +188,10 @@ async def edit_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
 
+    if query.data == CANCEL:
+        await query.edit_message_text("Cancelled.")
+        return ConversationHandler.END
+
     mood = query.data.split(":", 1)[1]
     entry = context.user_data["editing_entry"]
 
@@ -174,7 +201,7 @@ async def edit_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.user_data["editing_mood"] = entry["mood"]
 
     await query.edit_message_text(
-        f"Current thought: {entry['thought']}\n\nSend me the new text (or /skip to keep current):"
+        f"Current thought: {entry['thought']}\n\nSend me the new text (or /skip to keep current, /cancel to abort):"
     )
     return EDIT_TEXT
 
@@ -213,6 +240,7 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )]
         for e in entries
     ]
+    keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
     await update.message.reply_text(
         "Which entry do you want to delete?",
         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -223,6 +251,10 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def delete_select_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+
+    if query.data == CANCEL:
+        await query.edit_message_text("Cancelled.")
+        return ConversationHandler.END
 
     entry_id = int(query.data.split(":", 1)[1])
     entry = await db.get_entry(entry_id)
@@ -272,13 +304,14 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     context.user_data["import_date"] = target_date
-    await update.message.reply_text("Send me the entry text:")
+    await update.message.reply_text("Send me the entry text (or /cancel to abort):")
     return IMPORT_DATE
 
 
 async def import_text_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["import_text"] = update.message.text
     keyboard = [[InlineKeyboardButton(m, callback_data=f"imood:{m}")] for m in MOODS]
+    keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
     await update.message.reply_text("Pick a mood:", reply_markup=InlineKeyboardMarkup(keyboard))
     return IMPORT_MOOD
 
@@ -286,6 +319,10 @@ async def import_text_receive(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+
+    if query.data == CANCEL:
+        await query.edit_message_text("Cancelled.")
+        return ConversationHandler.END
 
     mood = query.data.split(":", 1)[1]
     target_date = context.user_data["import_date"]
@@ -316,6 +353,7 @@ async def cmd_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton(f"Remind window: {current_start}:00 – {current_end}:00", callback_data="set:remind")],
         [InlineKeyboardButton(f"Memory time: {current_memory}", callback_data="set:memory")],
+        [InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)],
     ]
     await update.message.reply_text(
         "⚙️ Settings\n\nTap to change:",
@@ -328,6 +366,10 @@ async def settings_select_callback(update: Update, context: ContextTypes.DEFAULT
     query = update.callback_query
     await query.answer()
 
+    if query.data == CANCEL:
+        await query.edit_message_text("Cancelled.")
+        return ConversationHandler.END
+
     setting = query.data.split(":", 1)[1]
     context.user_data["setting_type"] = setting
 
@@ -335,12 +377,12 @@ async def settings_select_callback(update: Update, context: ContextTypes.DEFAULT
         await query.edit_message_text(
             "Send reminder start and end hours, separated by a space.\n"
             "Example: 9 21 (means 9:00 AM to 9:00 PM)\n"
-            "Hours are in your timezone (0-23)."
+            "Hours are in your timezone (0-23).\n\n/cancel to abort."
         )
     elif setting == "memory":
         await query.edit_message_text(
             "Send the time for daily memory (HH:MM format).\n"
-            "Example: 09:00"
+            "Example: 09:00\n\n/cancel to abort."
         )
     return SETTINGS_VALUE
 

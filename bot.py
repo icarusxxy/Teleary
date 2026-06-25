@@ -34,6 +34,7 @@ from handlers import (
     view_entry_callback,
     cmd_search,
     search_result_callback,
+    cancel,
     MOOD_PICK,
     EDIT_SELECT,
     EDIT_MOOD,
@@ -59,6 +60,8 @@ async def post_shutdown(application: Application):
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
+    cancel_cb = CallbackQueryHandler(cancel, pattern=r"^cancel$")
+
     entry_conv = ConversationHandler(
         entry_points=[
             MessageHandler(
@@ -67,49 +70,67 @@ def main():
             )
         ],
         states={
-            MOOD_PICK: [CallbackQueryHandler(mood_callback, pattern=r"^mood:")],
+            MOOD_PICK: [
+                CallbackQueryHandler(mood_callback, pattern=r"^mood:"),
+                cancel_cb,
+            ],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler("cancel", cancel)],
     )
 
     edit_conv = ConversationHandler(
         entry_points=[CommandHandler("edit", cmd_edit)],
         states={
-            EDIT_SELECT: [CallbackQueryHandler(edit_select_callback, pattern=r"^edit:")],
-            EDIT_MOOD: [CallbackQueryHandler(edit_mood_callback, pattern=r"^emood:")],
+            EDIT_SELECT: [
+                CallbackQueryHandler(edit_select_callback, pattern=r"^edit:"),
+                cancel_cb,
+            ],
+            EDIT_MOOD: [
+                CallbackQueryHandler(edit_mood_callback, pattern=r"^emood:"),
+                cancel_cb,
+            ],
             EDIT_TEXT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, edit_text_receive),
                 CommandHandler("skip", edit_text_skip),
             ],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler("cancel", cancel)],
     )
 
     delete_conv = ConversationHandler(
         entry_points=[CommandHandler("delete", cmd_delete)],
         states={
-            EDIT_SELECT: [CallbackQueryHandler(delete_select_callback, pattern=r"^del:")],
+            EDIT_SELECT: [
+                CallbackQueryHandler(delete_select_callback, pattern=r"^del:"),
+                cancel_cb,
+            ],
             EDIT_TEXT: [CallbackQueryHandler(delete_confirm_callback, pattern=r"^del(yes|cancel)")],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler("cancel", cancel)],
     )
 
     import_conv = ConversationHandler(
         entry_points=[CommandHandler("import", cmd_import)],
         states={
             IMPORT_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, import_text_receive)],
-            IMPORT_MOOD: [CallbackQueryHandler(import_mood_callback, pattern=r"^imood:")],
+            IMPORT_MOOD: [
+                CallbackQueryHandler(import_mood_callback, pattern=r"^imood:"),
+                cancel_cb,
+            ],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler("cancel", cancel)],
     )
 
     settings_conv = ConversationHandler(
         entry_points=[CommandHandler("settings", cmd_settings)],
         states={
-            SETTINGS_SELECT: [CallbackQueryHandler(settings_select_callback, pattern=r"^set:")],
+            SETTINGS_SELECT: [
+                CallbackQueryHandler(settings_select_callback, pattern=r"^set:"),
+                cancel_cb,
+            ],
             SETTINGS_VALUE: [MessageHandler(filters.TEXT & ~filters.COMMAND, settings_value_receive)],
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler("cancel", cancel)],
     )
 
     app.add_handler(CommandHandler("start", cmd_start))
