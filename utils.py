@@ -53,6 +53,16 @@ def parse_time(raw: str) -> tuple[int, int, int]:
     raise ValueError(f"Invalid time format: {raw}")
 
 
+def db_to_local(utc_str: str) -> datetime:
+    """Convert a UTC timestamp string from the database to the configured timezone."""
+    return datetime.fromisoformat(utc_str).replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(TIMEZONE))
+
+
+def db_to_local_date(utc_str: str) -> str:
+    """Return the date portion (YYYY-MM-DD) of a UTC string in local timezone."""
+    return db_to_local(utc_str).strftime("%Y-%m-%d")
+
+
 def format_entry(date: datetime, mood: str, thought: str) -> str:
     label = MOOD_LABELS.get(mood, "")
     return f"{mood} {label} — {date.strftime('%Y-%m-%d %H:%M')}\n\n{thought}"

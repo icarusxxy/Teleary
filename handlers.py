@@ -13,7 +13,7 @@ import asyncio
 
 from config import MOODS, MOOD_LABELS, TIMEZONE
 import database as db
-from utils import format_entry, format_memory, get_now, parse_date, parse_time
+from utils import db_to_local, db_to_local_date, format_entry, format_memory, get_now, parse_date, parse_time
 from scheduler import set_chat_id
 
 
@@ -146,7 +146,7 @@ async def cmd_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["edit_entries"] = entries
     keyboard = [
         [InlineKeyboardButton(
-            f"{e['mood']} {e['created_at'][:10]} — {e['thought'][:30]}...",
+            f"{e['mood']} {db_to_local_date(e['created_at'])} — {e['thought'][:30]}...",
             callback_data=f"edit:{e['id']}",
         )]
         for e in entries
@@ -235,7 +235,7 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["delete_entries"] = entries
     keyboard = [
         [InlineKeyboardButton(
-            f"{e['mood']} {e['created_at'][:10]} — {e['thought'][:30]}...",
+            f"{e['mood']} {db_to_local_date(e['created_at'])} — {e['thought'][:30]}...",
             callback_data=f"del:{e['id']}",
         )]
         for e in entries
@@ -500,8 +500,9 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     context.user_data["list_mode"] = "history"
-    context.user_data["list_year"] = int(older[0]["created_at"][:4])
-    context.user_data["list_month"] = int(older[0]["created_at"][5:7])
+    first_local = db_to_local(older[0]["created_at"])
+    context.user_data["list_year"] = first_local.year
+    context.user_data["list_month"] = first_local.month
     context.user_data["list_offset"] = 10
 
     keyboard = _build_entry_buttons(older)
@@ -611,7 +612,7 @@ async def list_more_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 def _build_entry_buttons(entries: list[dict]) -> list[list[InlineKeyboardButton]]:
     return [
         [InlineKeyboardButton(
-            f"{e['mood']} {e['created_at'][:10]} — {e['thought'][:40]}{'...' if len(e['thought']) > 40 else ''}",
+            f"{e['mood']} {db_to_local_date(e['created_at'])} — {e['thought'][:40]}{'...' if len(e['thought']) > 40 else ''}",
             callback_data=f"view:{e['id']}",
         )]
         for e in entries
@@ -629,7 +630,7 @@ async def view_entry_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     text = format_entry(
-        datetime.fromisoformat(entry["created_at"]).replace(tzinfo=ZoneInfo(TIMEZONE)),
+        db_to_local(entry["created_at"]),
         entry["mood"],
         entry["thought"],
     )
@@ -660,7 +661,7 @@ async def cmd_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [InlineKeyboardButton(
-            f"{e['mood']} {e['created_at'][:10]} — {e['thought'][:40]}{'...' if len(e['thought']) > 40 else ''}",
+            f"{e['mood']} {db_to_local_date(e['created_at'])} — {e['thought'][:40]}{'...' if len(e['thought']) > 40 else ''}",
             callback_data=f"srch:{e['id']}",
         )]
         for e in entries
@@ -683,7 +684,7 @@ async def search_result_callback(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     text = format_entry(
-        datetime.fromisoformat(entry["created_at"]).replace(tzinfo=ZoneInfo(TIMEZONE)),
+        db_to_local(entry["created_at"]),
         entry["mood"],
         entry["thought"],
     )
@@ -706,7 +707,7 @@ async def send_memories(context):
 
     for entry in entries:
         text = format_memory(
-            datetime.fromisoformat(entry["created_at"]).replace(tzinfo=ZoneInfo(TIMEZONE)),
+            db_to_local(entry["created_at"]),
             entry["mood"],
             entry["thought"],
         )

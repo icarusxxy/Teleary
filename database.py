@@ -152,7 +152,7 @@ async def get_entries_on_this_day(month: int, day: int) -> list[dict]:
     results = []
     for r in rows:
         d = dict(r)
-        entry_date = datetime.fromisoformat(d["created_at"]).replace(tzinfo=tz)
+        entry_date = datetime.fromisoformat(d["created_at"]).replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
         if entry_date.year < now.year:
             results.append(d)
     return results
