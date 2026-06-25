@@ -1,4 +1,4 @@
-import logging
+from loguru import logger
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -39,9 +39,6 @@ from handlers import (
     SETTINGS_VALUE,
 )
 from scheduler import init_scheduler
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 async def post_init(application: Application):
