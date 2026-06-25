@@ -461,36 +461,44 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = get_now()
-    entries = await db.get_entries_page(now.year, now.month, limit=10)
+    entries = await db.get_all_entries_for_month(now.year, now.month, limit=31)
 
-    if not entries:
-        older = await db.get_entries_before(now.year, now.month, limit=10)
-        if not older:
-            await update.message.reply_text("No diary entries yet.")
-            return
+    if entries:
+        context.user_data["list_mode"] = "month"
+        context.user_data["list_year"] = now.year
+        context.user_data["list_month"] = now.month
+        context.user_data["list_offset"] = 0
 
-        context.user_data["list_year"] = older[0]["created_at"][:4]
-        context.user_data["list_month"] = int(older[0]["created_at"][5:7])
-        context.user_data["list_offset"] = 10
-
-        keyboard = _build_entry_buttons(older)
-        keyboard.append([InlineKeyboardButton(" older entries ▼", callback_data="listmore")])
+        keyboard = _build_entry_buttons(entries)
+        keyboard.append([InlineKeyboardButton("\u2b05\ufe0f", callback_data="listprev")])
+        # keyboard.append([InlineKeyboardButton("\u2716 Cancel", callback_data="cancel")])
 
         await update.message.reply_text(
-            f"📖 Older entries — {len(older)} shown",
+            f"\U0001f4d6 {now.strftime('%B %Y')} \u2014 {len(entries)} entries",
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
         return
 
-    context.user_data["list_year"] = now.year
-    context.user_data["list_month"] = now.month
+    older = await db.get_entries_before(now.year, now.month, limit=10)
+    if not older:
+        await update.message.reply_text(
+            "No diary entries yet. Start writing by sending me a message! \U0001f4dd"
+        )
+        return
+
+    context.user_data["list_mode"] = "history"
+    context.user_data["list_year"] = int(older[0]["created_at"][:4])
+    context.user_data["list_month"] = int(older[0]["created_at"][5:7])
     context.user_data["list_offset"] = 10
 
-    keyboard = _build_entry_buttons(entries)
-    keyboard.append([InlineKeyboardButton(" older entries ▼", callback_data="listmore")])
+    keyboard = _build_entry_buttons(older)
+    nav_row = []
+    nav_row.append(InlineKeyboardButton("\u2b05\ufe0f", callback_data="listprev"))
+    nav_row.append(InlineKeyboardButton("\u27a1\ufe0f", callback_data="listnext"))
+    keyboard.append(nav_row)
 
     await update.message.reply_text(
-        f"📖 {now.strftime('%B %Y')} — {len(entries)} entries",
+        f"\U0001f4d6 Older entries \u2014 {len(older)} shown",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
@@ -499,40 +507,92 @@ async def list_more_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
 
+    callback_data = query.data
+    mode = context.user_data.get("list_mode", "month")
     year = context.user_data.get("list_year")
     month = context.user_data.get("list_month")
     offset = context.user_data.get("list_offset", 0)
 
-    entries = await db.get_entries_page(year, month, limit=10, offset=offset)
+    if callback_data == "listprev":
+        if mode == "month":
+            context.user_data["list_mode"] = "history"
+            context.user_data["list_offset"] = 10
+            older = await db.get_entries_before(year, month, limit=10)
+            if not older:
+                await query.edit_message_text("No more entries.")
+                return
 
-    if not entries:
-        older = await db.get_entries_before(year, month, limit=10)
-        if not older:
-            await query.edit_message_text("No more entries.")
-            return
+            keyboard = _build_entry_buttons(older)
+            nav_row = [
+                InlineKeyboardButton("\u2b05\ufe0f", callback_data="listprev"),
+                InlineKeyboardButton("\u27a1\ufe0f", callback_data="listnext"),
+            ]
+            keyboard.append(nav_row)
 
-        context.user_data["list_year"] = older[0]["created_at"][:4]
-        context.user_data["list_month"] = int(older[0]["created_at"][5:7])
-        context.user_data["list_offset"] = 10
+            await query.edit_message_text(
+                f"\U0001f4d6 Older entries \u2014 {len(older)} shown",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
+        else:
+            new_offset = offset + 10
+            entries = await db.get_entries_before(year, month, limit=10, offset=new_offset)
+            if not entries:
+                await query.edit_message_text("No more entries.")
+                return
 
-        keyboard = _build_entry_buttons(older)
-        keyboard.append([InlineKeyboardButton(" older entries ▼", callback_data="listmore")])
+            context.user_data["list_offset"] = new_offset
 
-        await query.edit_message_text(
-            f"📖 Older entries — {len(older)} shown",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-        )
-        return
+            keyboard = _build_entry_buttons(entries)
+            nav_row = [
+                InlineKeyboardButton("\u2b05\ufe0f", callback_data="listprev"),
+                InlineKeyboardButton("\u27a1\ufe0f", callback_data="listnext"),
+            ]
+            keyboard.append(nav_row)
 
-    context.user_data["list_offset"] = offset + 10
+            await query.edit_message_text(
+                f"\U0001f4d6 Older entries \u2014 {len(entries)} shown",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
 
-    keyboard = _build_entry_buttons(entries)
-    keyboard.append([InlineKeyboardButton(" older entries ▼", callback_data="listmore")])
+    elif callback_data == "listnext":
+        if mode == "history":
+            if offset <= 10:
+                now = get_now()
+                entries = await db.get_all_entries_for_month(now.year, now.month, limit=31)
+                context.user_data["list_mode"] = "month"
+                context.user_data["list_year"] = now.year
+                context.user_data["list_month"] = now.month
+                context.user_data["list_offset"] = 0
 
-    await query.edit_message_text(
-        f"📖 More entries — {len(entries)} shown",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
+                keyboard = _build_entry_buttons(entries)
+                keyboard.append([InlineKeyboardButton("\u2b05\ufe0f", callback_data="listprev")])
+                # nav_row = [
+                #     InlineKeyboardButton("\u2b05\ufe0f", callback_data="listprev"),
+                #     InlineKeyboardButton("\u27a1\ufe0f", callback_data="listnext"),
+                # ]
+                # keyboard.append(nav_row)
+
+
+                await query.edit_message_text(
+                    f"\U0001f4d6 {now.strftime('%B %Y')} \u2014 {len(entries)} entries",
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                )
+            else:
+                new_offset = offset - 10
+                entries = await db.get_entries_before(year, month, limit=10, offset=new_offset)
+                context.user_data["list_offset"] = new_offset
+
+                keyboard = _build_entry_buttons(entries)
+                nav_row = [
+                    InlineKeyboardButton("\u2b05\ufe0f", callback_data="listprev"),
+                    InlineKeyboardButton("\u27a1\ufe0f", callback_data="listnext"),
+                ]
+                keyboard.append(nav_row)
+
+                await query.edit_message_text(
+                    f"\U0001f4d6 Newer entries \u2014 {len(entries)} shown",
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                )
 
 
 def _build_entry_buttons(entries: list[dict]) -> list[list[InlineKeyboardButton]]:

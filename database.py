@@ -78,6 +78,16 @@ async def get_entries_page(year: int, month: int, limit: int = 10, offset: int =
     return [dict(r) for r in rows]
 
 
+async def get_all_entries_for_month(year: int, month: int, limit: int = 31) -> list[dict]:
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT * FROM entries WHERE strftime('%Y-%m', created_at) = ? ORDER BY created_at DESC LIMIT ?",
+        (f"{year}-{month:02d}", limit),
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
 async def get_entries_before(year: int, month: int, limit: int = 10, offset: int = 0) -> list[dict]:
     db = await get_db()
     cursor = await db.execute(
