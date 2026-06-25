@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from config import TIMEZONE, MOOD_LABELS
@@ -6,6 +6,51 @@ from config import TIMEZONE, MOOD_LABELS
 
 def get_now() -> datetime:
     return datetime.now(ZoneInfo(TIMEZONE))
+
+
+def parse_date(raw: str) -> date:
+    """Parse a date string from common formats.
+
+    Accepted: YYYY-MM-DD, YYYY/MM/DD, YYYYMMDD
+    """
+    from re import fullmatch
+
+    cleaned = raw.strip()
+
+    # YYYYMMDD (digits only, 8 chars)
+    if fullmatch(r"\d{8}", cleaned):
+        y, m, d = int(cleaned[:4]), int(cleaned[4:6]), int(cleaned[6:8])
+        return date(y, m, d)
+
+    # Try common separators (YYYY-MM-DD / YYYY/MM/DD)
+    for sep in ("-", "/"):
+        parts = cleaned.split(sep)
+        if len(parts) == 3:
+            y, m, d = int(parts[0]), int(parts[1]), int(parts[2])
+            return date(y, m, d)
+
+    # Fallback to ISO format (YYYY-MM-DD) via stdlib
+    return date.fromisoformat(cleaned)
+
+
+def parse_time(raw: str) -> tuple[int, int, int]:
+    """Parse a time string.
+
+    Accepted: HHMM (→ HH:MM:00), HHMMSS (→ HH:MM:SS)
+    """
+    from re import fullmatch
+
+    cleaned = raw.strip()
+
+    if fullmatch(r"\d{4}", cleaned):
+        h, m = int(cleaned[:2]), int(cleaned[2:4])
+        return h, m, 0
+
+    if fullmatch(r"\d{6}", cleaned):
+        h, m, s = int(cleaned[:2]), int(cleaned[2:4]), int(cleaned[4:6])
+        return h, m, s
+
+    raise ValueError(f"Invalid time format: {raw}")
 
 
 def format_entry(date: datetime, mood: str, thought: str) -> str:

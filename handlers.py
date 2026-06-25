@@ -13,7 +13,7 @@ import asyncio
 
 from config import MOODS, MOOD_LABELS, TIMEZONE
 import database as db
-from utils import format_entry, format_memory, get_now
+from utils import format_entry, format_memory, get_now, parse_date, parse_time
 from scheduler import set_chat_id
 
 
@@ -294,16 +294,31 @@ async def delete_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
 async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     if not args:
-        await update.message.reply_text("Usage: /import YYYY-MM-DD\nThen send the text on the next line.")
+        await update.message.reply_text(
+            "Usage: /import YYYY-MM-DD [HHMM]\n"
+            "Accepts YYYY-MM-DD, YYYY/MM/DD, or YYYYMMDD.\n"
+            "Optional time: HHMM or HHMMSS.\n"
+            "Then send the text on the next line."
+        )
         return ConversationHandler.END
 
     try:
-        target_date = date.fromisoformat(args[0])
-    except ValueError:
-        await update.message.reply_text("Invalid date format. Use YYYY-MM-DD.")
+        target_date = parse_date(args[0])
+    except (ValueError, TypeError):
+        await update.message.reply_text("Invalid date format. Use YYYY-MM-DD, YYYY/MM/DD, or YYYYMMDD.")
         return ConversationHandler.END
 
-    context.user_data["import_date"] = target_date
+    h, m, s = 12, 0, 0
+    if len(args) > 1:
+        try:
+            h, m, s = parse_time(args[1])
+        except ValueError:
+            await update.message.reply_text("Invalid time format. Use HHMM or HHMMSS.")
+            return ConversationHandler.END
+
+    tz = ZoneInfo(TIMEZONE)
+    target_dt = datetime(target_date.year, target_date.month, target_date.day, h, m, s, tzinfo=tz)
+    context.user_data["import_date"] = target_dt
     await update.message.reply_text("Send me the entry text (or /cancel to abort):")
     return IMPORT_DATE
 
@@ -328,15 +343,13 @@ async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         return ConversationHandler.END
 
     mood = query.data.split(":", 1)[1]
-    target_date = context.user_data["import_date"]
+    target_dt = context.user_data["import_date"]
     text = context.user_data["import_text"]
 
-    tz = ZoneInfo(TIMEZONE)
-    dt = datetime(target_date.year, target_date.month, target_date.day, 12, 0, tzinfo=tz)
-    dt_utc = dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+    dt_utc = target_dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
 
     from loguru import logger
-    logger.debug(f"Import: target_date={target_date}, dt={dt}, dt_utc={dt_utc}, iso={dt_utc.isoformat()}")
+    logger.debug(f"Import: target_dt={target_dt}, dt_utc={dt_utc}, iso={dt_utc.isoformat()}")
 
     message_id = context.user_data.get("import_message_id")
 
@@ -353,7 +366,7 @@ async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     logger.debug(f"Import: stored created_at = {stored[0] if stored else 'N/A'}")
 
     label = MOOD_LABELS.get(mood, "")
-    await query.edit_message_text(f"✓ Imported! {mood} {label} — {target_date.isoformat()}")
+    await query.edit_message_text(f"✓ Imported! {mood} {label} — {target_dt:%Y-%m-%d %H:%M:%S}")
     return ConversationHandler.END
 
 
