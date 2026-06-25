@@ -9,6 +9,7 @@ from telegram.ext import (
 )
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
+import asyncio
 
 from config import MOODS, MOOD_LABELS, TIMEZONE
 import database as db
@@ -20,6 +21,9 @@ MOOD_PICK, ENTRY_TEXT, EDIT_SELECT, EDIT_MOOD, EDIT_TEXT = range(5)
 IMPORT_DATE, IMPORT_MOOD = range(5, 7)
 SETTINGS_SELECT, SETTINGS_VALUE = range(7, 9)
 
+_media_group_buffers: dict[str, list] = {}
+_media_group_locks: dict[str, asyncio.Event] = {}
+
 
 # ── /start ──────────────────────────────────────────────
 
@@ -27,7 +31,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_chat_id(update.effective_chat.id)
     await update.message.reply_text(
         "📖 Welcome to your Diary Bot!\n\n"
-        "Just send me any message and I'll help you log it with a mood.\n\n"
+        "Send me any message — text, photo, video, or album — and I'll help you log it with a mood.\n\n"
         "Commands:\n"
         "/edit — Edit a past entry\n"
         "/delete — Delete a past entry\n"
@@ -39,17 +43,62 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ── New Entry ───────────────────────────────────────────
 
-async def receive_entry_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def receive_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_chat_id(update.effective_chat.id)
-    context.user_data["pending_text"] = update.message.text
-    context.user_data["pending_message_id"] = update.message.message_id
+    msg = update.message
+
+    if msg.media_group_id:
+        await _handle_media_group(update, context)
+        return
+
+    text = msg.text or msg.caption or ""
+    context.user_data["pending_text"] = text
+    context.user_data["pending_message_id"] = msg.message_id
 
     keyboard = [[InlineKeyboardButton(m, callback_data=f"mood:{m}")] for m in MOODS]
-    await update.message.reply_text(
+    await msg.reply_text(
         "How are you feeling?",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return MOOD_PICK
+
+
+async def _handle_media_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    group_id = msg.media_group_id
+
+    if group_id not in _media_group_buffers:
+        _media_group_buffers[group_id] = []
+        _media_group_locks[group_id] = asyncio.Event()
+
+    _media_group_buffers[group_id].append(msg)
+
+    async def _process_group():
+        await asyncio.sleep(1.5)
+        messages = _media_group_buffers.pop(group_id, [])
+        _media_group_locks.pop(group_id, None)
+
+        if not messages:
+            return
+
+        messages.sort(key=lambda m: m.message_id)
+        first_msg = messages[0]
+        caption = first_msg.caption or ""
+        message_ids = [m.message_id for m in messages]
+
+        context.user_data["pending_text"] = caption
+        context.user_data["pending_message_id"] = first_msg.message_id
+        context.user_data["pending_media_group_ids"] = message_ids
+
+        keyboard = [[InlineKeyboardButton(m, callback_data=f"mood:{m}")] for m in MOODS]
+        await first_msg.reply_text(
+            f"📸 Album with {len(messages)} items received. How are you feeling?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+
+    if group_id not in _media_group_locks or not _media_group_locks[group_id].is_set():
+        _media_group_locks[group_id] = asyncio.Event()
+        asyncio.create_task(_process_group())
 
 
 async def mood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -57,8 +106,9 @@ async def mood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     mood = query.data.split(":", 1)[1]
-    text = context.user_data.pop("pending_text")
+    text = context.user_data.pop("pending_text", "")
     message_id = context.user_data.pop("pending_message_id")
+    context.user_data.pop("pending_media_group_ids", None)
 
     entry_id = await db.save_entry(message_id, mood, text)
     label = MOOD_LABELS.get(mood, "")

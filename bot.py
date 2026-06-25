@@ -12,7 +12,7 @@ from config import BOT_TOKEN
 import database as db
 from handlers import (
     cmd_start,
-    receive_entry_text,
+    receive_entry,
     mood_callback,
     cmd_edit,
     edit_select_callback,
@@ -58,7 +58,12 @@ def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
     entry_conv = ConversationHandler(
-        entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, receive_entry_text)],
+        entry_points=[
+            MessageHandler(
+                (filters.TEXT | filters.PHOTO | filters.VIDEO | filters.ANIMATION | filters.VOICE | filters.VIDEO_NOTE | filters.AUDIO) & ~filters.COMMAND,
+                receive_entry,
+            )
+        ],
         states={
             MOOD_PICK: [CallbackQueryHandler(mood_callback, pattern=r"^mood:")],
         },
