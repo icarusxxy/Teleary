@@ -29,7 +29,7 @@ EDIT_SEARCH, EDIT_KEYWORD, EDIT_DATE = range(12, 15)
 CANCEL = "cancel"
 
 _media_group_buffers: dict[str, list] = {}
-_media_group_locks: dict[str, asyncio.Event] = {}
+_media_group_locks: dict[str, bool] = {}
 
 
 def _cancel_keyboard() -> InlineKeyboardMarkup:
@@ -76,7 +76,7 @@ async def receive_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if msg.media_group_id:
         log.debug("media_group_received user_id={} group_id={}", user_id, msg.media_group_id)
         await _handle_media_group(update, context)
-        return
+        return MOOD_PICK
 
     text = msg.text or msg.caption or ""
     log.debug("entry_received user_id={} text_len={} has_media={}", user_id, len(text), bool(msg.photo or msg.video))
@@ -98,7 +98,6 @@ async def _handle_media_group(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if group_id not in _media_group_buffers:
         _media_group_buffers[group_id] = []
-        _media_group_locks[group_id] = asyncio.Event()
 
     _media_group_buffers[group_id].append(msg)
 
@@ -108,7 +107,7 @@ async def _handle_media_group(update: Update, context: ContextTypes.DEFAULT_TYPE
         _media_group_locks.pop(group_id, None)
 
         if not messages:
-            log.warn("media_group_empty group_id={}", group_id)
+            log.warning("media_group_empty group_id={}", group_id)
             return
 
         messages.sort(key=lambda m: m.message_id)
@@ -128,8 +127,8 @@ async def _handle_media_group(update: Update, context: ContextTypes.DEFAULT_TYPE
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
 
-    if group_id not in _media_group_locks or not _media_group_locks[group_id].is_set():
-        _media_group_locks[group_id] = asyncio.Event()
+    if group_id not in _media_group_locks:
+        _media_group_locks[group_id] = True
         asyncio.create_task(_process_group())
 
 
@@ -273,7 +272,7 @@ async def edit_select_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     entry_id = int(query.data.split(":", 1)[1])
     entry = await db.get_entry(entry_id)
     if not entry:
-        log.warn("edit_entry_not_found entry_id={}", entry_id)
+        log.warning("edit_entry_not_found entry_id={}", entry_id)
         await query.edit_message_text("Entry not found.")
         return ConversationHandler.END
 
@@ -462,7 +461,7 @@ async def delete_select_callback(update: Update, context: ContextTypes.DEFAULT_T
     entry_id = int(query.data.split(":", 1)[1])
     entry = await db.get_entry(entry_id)
     if not entry:
-        log.warn("delete_entry_not_found entry_id={}", entry_id)
+        log.warning("delete_entry_not_found entry_id={}", entry_id)
         await query.edit_message_text("Entry not found.")
         return ConversationHandler.END
 
@@ -838,7 +837,7 @@ async def view_entry_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     entry_id = int(query.data.split(":", 1)[1])
     entry = await db.get_entry(entry_id)
     if not entry:
-        log.warn("view_entry_not_found entry_id={}", entry_id)
+        log.warning("view_entry_not_found entry_id={}", entry_id)
         await query.edit_message_text("Entry not found.")
         return
 
@@ -852,7 +851,7 @@ async def view_entry_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         try:
             await query.message.reply_text(text, reply_to_message_id=entry["message_id"])
         except Exception as e:
-            log.warn("view_reply_failed entry_id={} error={}", entry_id, str(e))
+            log.warning("view_reply_failed entry_id={} error={}", entry_id, str(e))
             await query.message.reply_text(text)
     else:
         await query.message.reply_text(text)
@@ -895,7 +894,7 @@ async def search_result_callback(update: Update, context: ContextTypes.DEFAULT_T
     entry_id = int(query.data.split(":", 1)[1])
     entry = await db.get_entry(entry_id)
     if not entry:
-        log.warn("search_result_not_found entry_id={}", entry_id)
+        log.warning("search_result_not_found entry_id={}", entry_id)
         await query.edit_message_text("Entry not found.")
         return
 
@@ -909,7 +908,7 @@ async def search_result_callback(update: Update, context: ContextTypes.DEFAULT_T
         try:
             await query.message.reply_text(text, reply_to_message_id=entry["message_id"])
         except Exception as e:
-            log.warn("search_reply_failed entry_id={} error={}", entry_id, str(e))
+            log.warning("search_reply_failed entry_id={} error={}", entry_id, str(e))
             await query.message.reply_text(text)
     else:
         await query.message.reply_text(text)
@@ -938,7 +937,7 @@ async def send_memories(context):
                     reply_to_message_id=entry["message_id"],
                 )
             except Exception as e:
-                log.warn("memory_reply_failed entry_id={} error={}", entry["id"], str(e))
+                log.warning("memory_reply_failed entry_id={} error={}", entry["id"], str(e))
                 await context.bot.send_message(chat_id=chat_id, text=text)
         else:
             await context.bot.send_message(chat_id=chat_id, text=text)
