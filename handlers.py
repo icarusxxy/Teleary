@@ -387,7 +387,7 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "Usage: /import YYYY-MM-DD [HHMM]\n"
             "Accepts YYYY-MM-DD, YYYY/MM/DD, or YYYYMMDD.\n"
-            "Optional time: HHMM or HHMMSS.\n"
+            "Optional time: HHMM, HH:MM, HHMMSS, or HH:MM:SS.\n"
             "Then send the text on the next line."
         )
         return ConversationHandler.END

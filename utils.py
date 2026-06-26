@@ -36,18 +36,30 @@ def parse_date(raw: str) -> date:
 def parse_time(raw: str) -> tuple[int, int, int]:
     """Parse a time string.
 
-    Accepted: HHMM (→ HH:MM:00), HHMMSS (→ HH:MM:SS)
+    Accepted: HHMM, HH:MM (→ HH:MM:00), HHMMSS, HH:MM:SS (→ HH:MM:SS)
     """
     from re import fullmatch
 
     cleaned = raw.strip()
 
+    # HHMM (digits only, 4 chars)
     if fullmatch(r"\d{4}", cleaned):
         h, m = int(cleaned[:2]), int(cleaned[2:4])
         return h, m, 0
 
+    # HH:MM (with colon)
+    if fullmatch(r"\d{2}:\d{2}", cleaned):
+        h, m = int(cleaned[:2]), int(cleaned[3:5])
+        return h, m, 0
+
+    # HHMMSS (digits only, 6 chars)
     if fullmatch(r"\d{6}", cleaned):
         h, m, s = int(cleaned[:2]), int(cleaned[2:4]), int(cleaned[4:6])
+        return h, m, s
+
+    # HH:MM:SS (with colons)
+    if fullmatch(r"\d{2}:\d{2}:\d{2}", cleaned):
+        h, m, s = int(cleaned[:2]), int(cleaned[3:5]), int(cleaned[6:8])
         return h, m, s
 
     raise ValueError(f"Invalid time format: {raw}")
