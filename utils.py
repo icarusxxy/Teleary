@@ -34,6 +34,40 @@ def parse_date(raw: str) -> date:
     return date.fromisoformat(cleaned)
 
 
+def parse_date_pattern(raw: str) -> str:
+    """Normalize a date string into a prefix for LIKE queries.
+
+    Accepted: YYYY, YYYYMM, YYYY-MM, YYYYMMDD, YYYY-MM-DD, YYYY/MM/DD
+    Returns: 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'
+    Raises ValueError if the input doesn't match a known pattern.
+    """
+    from re import fullmatch
+
+    cleaned = raw.strip()
+
+    # 4 digits → YYYY
+    if fullmatch(r"\d{4}", cleaned):
+        return cleaned
+
+    # 6 digits → YYYY-MM (from YYYYMM)
+    if fullmatch(r"\d{6}", cleaned):
+        return f"{cleaned[:4]}-{cleaned[4:6]}"
+
+    # 8 digits → YYYY-MM-DD (from YYYYMMDD)
+    if fullmatch(r"\d{8}", cleaned):
+        return f"{cleaned[:4]}-{cleaned[4:6]}-{cleaned[6:8]}"
+
+    # With separators
+    for sep in ("-", "/"):
+        parts = cleaned.split(sep)
+        if len(parts) == 2 and all(p.isdigit() for p in parts):
+            return f"{parts[0]}-{parts[1]}"
+        if len(parts) == 3 and all(p.isdigit() for p in parts):
+            return f"{parts[0]}-{parts[1]}-{parts[2]}"
+
+    raise ValueError(f"Invalid date pattern: {raw}")
+
+
 def parse_time(raw: str) -> tuple[int, int, int]:
     """Parse a time string.
 
@@ -79,7 +113,7 @@ def db_to_local_date(utc_str: str) -> str:
 async def format_entry(date: datetime, mood: str, thought: str) -> str:
     mood_labels = await emoji_config.get_mood_labels()
     label = mood_labels.get(mood, "")
-    return f"{mood} {label} — {date.strftime('%Y-%m-%d %H:%M')}\n\n{thought}"
+    return f"{mood} {label} — {date.strftime('%A, %Y-%m-%d %H:%M')}\n\n{thought}"
 
 
 async def format_memory(date: datetime, mood: str, thought: str) -> str:
@@ -87,5 +121,5 @@ async def format_memory(date: datetime, mood: str, thought: str) -> str:
     label = mood_labels.get(mood, "")
     years_ago = get_now().year - date.year
     suffix = "year" if years_ago == 1 else "years"
-    header = f"🗓 {years_ago} {suffix} ago — {date.strftime('%Y-%m-%d')}"
+    header = f"🗓 {years_ago} {suffix} ago — {date.strftime('%A, %Y-%m-%d')}"
     return f"{header}\n{mood} {label}\n\n{thought}"

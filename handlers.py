@@ -15,7 +15,7 @@ from loguru import logger
 from config import TIMEZONE
 import emoji_config
 import database as db
-from utils import db_to_local, db_to_local_date, format_entry, format_memory, get_now, parse_date, parse_time
+from utils import db_to_local, db_to_local_date, format_entry, format_memory, get_now, parse_date, parse_date_pattern, parse_time
 from scheduler import set_chat_id
 
 log = logger.bind(module="handlers")
@@ -61,6 +61,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/list — Browse your entries\n"
         "/random — Get a random diary entry\n"
         "/search <text> — Search your diary\n"
+        "/search_by_date <date> — Search by date (YYYY, YYYY-MM, YYYY-MM-DD)\n"
         "/edit — Edit a past entry\n"
         "/delete — Delete a past entry\n"
         "/import YYYY-MM-DD — Import a past entry\n"
@@ -1209,6 +1210,52 @@ async def cmd_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(text)
     else:
         await update.message.reply_text(text)
+
+
+# ── /search_by_date ─────────────────────────────────────
+
+async def cmd_search_by_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
+
+    raw = " ".join(context.args) if context.args else ""
+    if not raw:
+        await update.message.reply_text(
+            "Usage: /search_by_date <date>\n\n"
+            "Formats: YYYY, YYYY-MM, YYYY-MM-DD\n"
+            "Examples: 2026, 2026-06, 2026-06-25"
+        )
+        return
+
+    try:
+        pattern = parse_date_pattern(raw)
+    except ValueError:
+        await update.message.reply_text(
+            f'Invalid date pattern "{raw}". Use YYYY, YYYY-MM, or YYYY-MM-DD.'
+        )
+        return
+
+    entries = await db.get_entries_by_date_pattern(pattern, limit=30)
+    log.debug("search_by_date user_id={} pattern='{}' result_count={}", update.effective_user.id, pattern, len(entries))
+
+    if not entries:
+        await update.message.reply_text(f'No entries matching "{pattern}".')
+        return
+
+    context.user_data["search_entries"] = {e["id"]: e for e in entries}
+
+    keyboard = [
+        [InlineKeyboardButton(
+            f"{e['mood']} {db_to_local_date(e['created_at'])} — {e['thought'][:40]}{'...' if len(e['thought']) > 40 else ''}",
+            callback_data=f"srch:{e['id']}",
+        )]
+        for e in entries
+    ]
+
+    await update.message.reply_text(
+        f"📅 {len(entries)} result(s) for {pattern}",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
 
 
 # ── Memory (called by scheduler) ────────────────────────
