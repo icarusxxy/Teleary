@@ -540,6 +540,58 @@ async def import_text_receive(update: Update, context: ContextTypes.DEFAULT_TYPE
     return IMPORT_MOOD
 
 
+async def import_media_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    import_date = context.user_data.get('import_date')
+    log.debug("import_media_received user_id={} import_date={} has_group={}", update.effective_user.id, import_date, bool(msg.media_group_id))
+
+    if msg.media_group_id:
+        group_id = msg.media_group_id
+        if group_id not in _media_group_buffers:
+            _media_group_buffers[group_id] = []
+        _media_group_buffers[group_id].append(msg)
+
+        async def _process_import_group():
+            await asyncio.sleep(1.5)
+            messages = _media_group_buffers.pop(group_id, [])
+            _media_group_locks.pop(group_id, None)
+
+            if not messages:
+                log.warning("import_media_group_empty group_id={}", group_id)
+                return
+
+            messages.sort(key=lambda m: m.message_id)
+            first_msg = messages[0]
+            caption = first_msg.caption or ""
+            message_ids = [m.message_id for m in messages]
+            log.info("import_media_group_resolved group_id={} item_count={} caption_len={}", group_id, len(messages), len(caption))
+
+            context.user_data["import_text"] = caption
+            context.user_data["import_message_id"] = first_msg.message_id
+            context.user_data["import_media_group_ids"] = message_ids
+
+            keyboard = [[InlineKeyboardButton(m, callback_data=f"imood:{m}")] for m in MOODS]
+            keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
+            await first_msg.reply_text(
+                f"📸 Album with {len(messages)} items. Pick a mood:",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
+
+        if group_id not in _media_group_locks:
+            _media_group_locks[group_id] = True
+            asyncio.create_task(_process_import_group())
+    else:
+        context.user_data["import_text"] = msg.caption or ""
+        context.user_data["import_message_id"] = msg.message_id
+
+        keyboard = [[InlineKeyboardButton(m, callback_data=f"imood:{m}")] for m in MOODS]
+        keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
+        await msg.reply_text("Pick a mood:", reply_markup=InlineKeyboardMarkup(keyboard))
+        return IMPORT_MOOD
+
+    return IMPORT_MOOD
+
+
 async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -550,13 +602,17 @@ async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     mood = query.data.split(":", 1)[1]
     target_dt = context.user_data["import_date"]
-    text = context.user_data["import_text"]
+    text = context.user_data.get("import_text", "")
 
     dt_utc = target_dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
 
     log.debug("import_saving user_id={} target_dt={} dt_utc={}", update.effective_user.id, target_dt, dt_utc)
 
     message_id = context.user_data.get("import_message_id")
+    media_ids = context.user_data.pop("import_media_group_ids", None)
+
+    if media_ids:
+        log.debug("import_media_group_ids={} count={}", media_ids, len(media_ids))
 
     db_conn = await db.get_db()
     cursor = await db_conn.execute(
@@ -565,14 +621,14 @@ async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     )
     await db_conn.commit()
 
-    # verify what was stored
     row = await db_conn.execute("SELECT created_at FROM entries WHERE id = ?", (cursor.lastrowid,))
     stored = await row.fetchone()
     log.debug("import_stored entry_id={} created_at={}", cursor.lastrowid, stored[0] if stored else "N/A")
 
     label = MOOD_LABELS.get(mood, "")
     log.info("entry_imported entry_id={} mood={} target_dt={} user_id={}", cursor.lastrowid, mood, target_dt, update.effective_user.id)
-    await query.edit_message_text(f"✓ Imported! {mood} {label} — {target_dt:%Y-%m-%d %H:%M:%S}")
+    media_count = f" ({len(media_ids)} items)" if media_ids else ""
+    await query.edit_message_text(f"✓ Imported! {mood} {label}{media_count} — {target_dt:%Y-%m-%d %H:%M:%S}")
     return ConversationHandler.END
 
 

@@ -33,6 +33,7 @@ from handlers import (
     delete_confirm_callback,
     cmd_import,
     import_text_receive,
+    import_media_receive,
     import_mood_callback,
     cmd_settings,
     settings_select_callback,
@@ -150,7 +151,13 @@ def main():
     import_conv = ConversationHandler(
         entry_points=[CommandHandler("import", cmd_import)],
         states={
-            IMPORT_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, import_text_receive)],
+            IMPORT_DATE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, import_text_receive),
+                MessageHandler(
+                    (filters.PHOTO | filters.VIDEO | filters.ANIMATION | filters.VOICE | filters.VIDEO_NOTE | filters.AUDIO) & ~filters.COMMAND,
+                    import_media_receive,
+                ),
+            ],
             IMPORT_MOOD: [
                 CallbackQueryHandler(import_mood_callback, pattern=r"^imood:"),
                 cancel_cb,
