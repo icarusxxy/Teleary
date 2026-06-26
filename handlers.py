@@ -12,7 +12,8 @@ from zoneinfo import ZoneInfo
 import asyncio
 
 from loguru import logger
-from config import MOODS, MOOD_LABELS, TIMEZONE
+from config import TIMEZONE
+import emoji_config
 import database as db
 from utils import db_to_local, db_to_local_date, format_entry, format_memory, get_now, parse_date, parse_time
 from scheduler import set_chat_id
@@ -25,6 +26,7 @@ IMPORT_DATE, IMPORT_MOOD = range(5, 7)
 SETTINGS_SELECT, SETTINGS_VALUE = range(7, 9)
 DELETE_SEARCH, DELETE_KEYWORD, DELETE_DATE = range(9, 12)
 EDIT_SEARCH, EDIT_KEYWORD, EDIT_DATE = range(12, 15)
+EMOJI_SETTINGS_MAIN, EMOJI_ADD, EMOJI_REMOVE, EMOJI_EDIT = range(15, 19)
 
 CANCEL = "cancel"
 
@@ -61,7 +63,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/edit — Edit a past entry\n"
         "/delete — Delete a past entry\n"
         "/import YYYY-MM-DD — Import a past entry\n"
-        "/settings — Configure reminders & memory\n"
+        "/settings — Configure reminders, memory & emojis\n"
         "/stats — View your journaling stats"
     )
 
@@ -83,7 +85,8 @@ async def receive_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["pending_text"] = text
     context.user_data["pending_message_id"] = msg.message_id
 
-    keyboard = [[InlineKeyboardButton(m, callback_data=f"mood:{m}")] for m in MOODS]
+    moods = await emoji_config.get_moods()
+    keyboard = [[InlineKeyboardButton(m, callback_data=f"mood:{m}")] for m in moods]
     keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
     await msg.reply_text(
         "How are you feeling?",
@@ -120,7 +123,8 @@ async def _handle_media_group(update: Update, context: ContextTypes.DEFAULT_TYPE
         context.user_data["pending_message_id"] = first_msg.message_id
         context.user_data["pending_media_group_ids"] = message_ids
 
-        keyboard = [[InlineKeyboardButton(m, callback_data=f"mood:{m}")] for m in MOODS]
+        moods = await emoji_config.get_moods()
+        keyboard = [[InlineKeyboardButton(m, callback_data=f"mood:{m}")] for m in moods]
         keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
         await first_msg.reply_text(
             f"📸 Album with {len(messages)} items received. How are you feeling?",
@@ -142,7 +146,8 @@ async def mood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("pending_media_group_ids", None)
 
     entry_id = await db.save_entry(message_id, mood, text)
-    label = MOOD_LABELS.get(mood, "")
+    mood_labels = await emoji_config.get_mood_labels()
+    label = mood_labels.get(mood, "")
     log.info("entry_saved entry_id={} mood={} text_len={} user_id={}", entry_id, mood, len(text), update.effective_user.id)
     await query.edit_message_text(f"✓ Saved! {mood} {label}")
     return ConversationHandler.END
@@ -278,7 +283,8 @@ async def edit_select_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     log.debug("edit_entry_selected entry_id={} user_id={}", entry_id, update.effective_user.id)
     context.user_data["editing_entry"] = entry
-    keyboard = [[InlineKeyboardButton(m, callback_data=f"emood:{m}")] for m in MOODS]
+    moods = await emoji_config.get_moods()
+    keyboard = [[InlineKeyboardButton(m, callback_data=f"emood:{m}")] for m in moods]
     keyboard.append([InlineKeyboardButton("Keep current", callback_data="emood:keep")])
     keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
     await query.edit_message_text(
@@ -534,7 +540,8 @@ async def import_text_receive(update: Update, context: ContextTypes.DEFAULT_TYPE
     log.debug("import_text_received user_id={} import_date={}", update.effective_user.id, import_date)
     context.user_data["import_text"] = update.message.text
     context.user_data["import_message_id"] = update.message.message_id
-    keyboard = [[InlineKeyboardButton(m, callback_data=f"imood:{m}")] for m in MOODS]
+    moods = await emoji_config.get_moods()
+    keyboard = [[InlineKeyboardButton(m, callback_data=f"imood:{m}")] for m in moods]
     keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
     await update.message.reply_text("Pick a mood:", reply_markup=InlineKeyboardMarkup(keyboard))
     return IMPORT_MOOD
@@ -570,7 +577,8 @@ async def import_media_receive(update: Update, context: ContextTypes.DEFAULT_TYP
             context.user_data["import_message_id"] = first_msg.message_id
             context.user_data["import_media_group_ids"] = message_ids
 
-            keyboard = [[InlineKeyboardButton(m, callback_data=f"imood:{m}")] for m in MOODS]
+            moods = await emoji_config.get_moods()
+            keyboard = [[InlineKeyboardButton(m, callback_data=f"imood:{m}")] for m in moods]
             keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
             await first_msg.reply_text(
                 f"📸 Album with {len(messages)} items. Pick a mood:",
@@ -584,7 +592,8 @@ async def import_media_receive(update: Update, context: ContextTypes.DEFAULT_TYP
         context.user_data["import_text"] = msg.caption or ""
         context.user_data["import_message_id"] = msg.message_id
 
-        keyboard = [[InlineKeyboardButton(m, callback_data=f"imood:{m}")] for m in MOODS]
+        moods = await emoji_config.get_moods()
+        keyboard = [[InlineKeyboardButton(m, callback_data=f"imood:{m}")] for m in moods]
         keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
         await msg.reply_text("Pick a mood:", reply_markup=InlineKeyboardMarkup(keyboard))
         return IMPORT_MOOD
@@ -625,7 +634,8 @@ async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     stored = await row.fetchone()
     log.debug("import_stored entry_id={} created_at={}", cursor.lastrowid, stored[0] if stored else "N/A")
 
-    label = MOOD_LABELS.get(mood, "")
+    mood_labels = await emoji_config.get_mood_labels()
+    label = mood_labels.get(mood, "")
     log.info("entry_imported entry_id={} mood={} target_dt={} user_id={}", cursor.lastrowid, mood, target_dt, update.effective_user.id)
     media_count = f" ({len(media_ids)} items)" if media_ids else ""
     await query.edit_message_text(f"✓ Imported! {mood} {label}{media_count} — {target_dt:%Y-%m-%d %H:%M:%S}")
@@ -636,6 +646,10 @@ async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def cmd_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     log.debug("settings_opened user_id={}", update.effective_user.id)
+    return await _show_settings_menu(update, context)
+
+
+async def _show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_start = await db.get_setting("reminder_start") or "9"
     current_end = await db.get_setting("reminder_end") or "21"
     current_memory = await db.get_setting("memory_time") or "09:00"
@@ -643,12 +657,22 @@ async def cmd_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton(f"Remind window: {current_start}:00 – {current_end}:00", callback_data="set:remind")],
         [InlineKeyboardButton(f"Memory time: {current_memory}", callback_data="set:memory")],
+        [InlineKeyboardButton("😊 Emojis", callback_data="set:emoji")],
         [InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)],
     ]
-    await update.message.reply_text(
-        "⚙️ Settings\n\nTap to change:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
+
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        await query.edit_message_text(
+            "⚙️ Settings\n\nTap to change:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+    else:
+        await update.message.reply_text(
+            "⚙️ Settings\n\nTap to change:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
     return SETTINGS_SELECT
 
 
@@ -674,6 +698,8 @@ async def settings_select_callback(update: Update, context: ContextTypes.DEFAULT
             "Send the time for daily memory (HH:MM format).\n"
             "Example: 09:00\n\n/cancel to abort."
         )
+    elif setting == "emoji":
+        return await _show_emoji_list(update, context)
     return SETTINGS_VALUE
 
 
@@ -714,15 +740,202 @@ async def settings_value_receive(update: Update, context: ContextTypes.DEFAULT_T
     return ConversationHandler.END
 
 
+# ── Emoji settings (part of /settings) ─────────────────
+
+async def _show_emoji_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    moods_full = await emoji_config.get_moods_full()
+    text_lines = ["😊 Current emojis:\n"]
+    keyboard = []
+
+    for item in moods_full:
+        text_lines.append(f"  {item['emoji']} {item['label']}")
+        keyboard.append([
+            InlineKeyboardButton(f"{item['emoji']} {item['label']}", callback_data=f"emojiset:edit:{item['emoji']}"),
+            InlineKeyboardButton("✖", callback_data=f"emojiset:remove:{item['emoji']}"),
+        ])
+
+    keyboard.append([InlineKeyboardButton("➕ Add emoji", callback_data="emojiset:add")])
+    keyboard.append([InlineKeyboardButton("🔄 Reset to default", callback_data="emojiset:reset")])
+    keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
+
+    text = "\n".join(text_lines) + "\n\nTap an emoji to edit its label, ✖ to remove, or ➕ to add a new one."
+
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    else:
+        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+    return EMOJI_SETTINGS_MAIN
+
+
+async def emoji_settings_main_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == CANCEL:
+        return await _show_settings_menu(update, context)
+
+    action = query.data.split(":", 1)[1]
+
+    if action == "add":
+        await query.edit_message_text(
+            "Send me the emoji and its label, separated by a space.\n"
+            "Example: 🤩 Excited\n\n/cancel to abort."
+        )
+        return EMOJI_ADD
+
+    if action == "reset":
+        default_list = "\n".join(f"  {m['emoji']} {m['label']}" for m in emoji_config.DEFAULT_MOODS)
+        keyboard = [
+            [
+                InlineKeyboardButton("Yes, reset", callback_data="emojiset:confirmreset"),
+                InlineKeyboardButton("Cancel", callback_data="emojiset:cancelreset"),
+            ]
+        ]
+        await query.edit_message_text(
+            f"Reset to default emojis?\n\n{default_list}",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return EMOJI_REMOVE
+
+    if action.startswith("edit:"):
+        emoji = action.split(":", 1)[1]
+        moods_full = await emoji_config.get_moods_full()
+        item = next((m for m in moods_full if m["emoji"] == emoji), None)
+        if not item:
+            await query.edit_message_text("Emoji not found.")
+            return await _show_settings_menu(update, context)
+
+        context.user_data["editing_emoji"] = emoji
+        await query.edit_message_text(
+            f"Current: {item['emoji']} {item['label']}\n\n"
+            "Send the new emoji and label, separated by a space.\n"
+            "Example: 🤩 Excited\n\n/cancel to abort."
+        )
+        return EMOJI_EDIT
+
+    if action.startswith("remove:"):
+        emoji = action.split(":", 1)[1]
+        moods_full = await emoji_config.get_moods_full()
+        item = next((m for m in moods_full if m["emoji"] == emoji), None)
+        if not item:
+            await query.edit_message_text("Emoji not found.")
+            return await _show_settings_menu(update, context)
+
+        keyboard = [
+            [
+                InlineKeyboardButton("Yes, remove", callback_data=f"emojiset:confirmremove:{emoji}"),
+                InlineKeyboardButton("Cancel", callback_data="emojiset:cancelremove"),
+            ]
+        ]
+        await query.edit_message_text(
+            f"Remove {item['emoji']} {item['label']}?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return EMOJI_REMOVE
+
+    return EMOJI_SETTINGS_MAIN
+
+
+async def emoji_add_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    parts = text.split(maxsplit=1)
+
+    if len(parts) < 2:
+        await update.message.reply_text(
+            "Please send an emoji and a label separated by a space.\n"
+            "Example: 🤩 Excited"
+        )
+        return EMOJI_ADD
+
+    emoji, label = parts[0], parts[1]
+
+    moods_full = await emoji_config.get_moods_full()
+    if any(m["emoji"] == emoji for m in moods_full):
+        await update.message.reply_text(f"{emoji} is already in the list.")
+        return EMOJI_ADD
+
+    moods_full.append({"emoji": emoji, "label": label})
+    await emoji_config.set_moods(moods_full)
+    log.info("emoji_added emoji={} label={} user_id={}", emoji, label, update.effective_user.id)
+    await update.message.reply_text(f"✓ Added {emoji} {label}")
+
+    return await _show_settings_menu(update, context)
+
+
+async def emoji_edit_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    old_emoji = context.user_data.pop("editing_emoji", None)
+    if not old_emoji:
+        await update.message.reply_text("Something went wrong. Please try again from /settings.")
+        return await _show_settings_menu(update, context)
+
+    text = update.message.text.strip()
+    parts = text.split(maxsplit=1)
+
+    if len(parts) < 2:
+        await update.message.reply_text(
+            "Please send an emoji and a label separated by a space.\n"
+            "Example: 🤩 Excited"
+        )
+        return EMOJI_EDIT
+
+    new_emoji, new_label = parts[0], parts[1]
+
+    moods_full = await emoji_config.get_moods_full()
+    if new_emoji != old_emoji and any(m["emoji"] == new_emoji for m in moods_full):
+        await update.message.reply_text(f"{new_emoji} is already in the list.")
+        return EMOJI_EDIT
+
+    for item in moods_full:
+        if item["emoji"] == old_emoji:
+            item["emoji"] = new_emoji
+            item["label"] = new_label
+            break
+
+    await emoji_config.set_moods(moods_full)
+    log.info("emoji_updated old_emoji={} new_emoji={} new_label={} user_id={}", old_emoji, new_emoji, new_label, update.effective_user.id)
+    await update.message.reply_text(f"✓ Updated {old_emoji} → {new_emoji} {new_label}")
+
+    return await _show_settings_menu(update, context)
+
+
+async def emoji_remove_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "emojiset:cancelremove":
+        return await _show_settings_menu(update, context)
+
+    if query.data == "emojiset:cancelreset":
+        return await _show_emoji_list(update, context)
+
+    if query.data == "emojiset:confirmreset":
+        await emoji_config.set_moods(emoji_config.DEFAULT_MOODS)
+        log.info("emojis_reset_to_default user_id={}", update.effective_user.id)
+        return await _show_emoji_list(update, context)
+
+    emoji = query.data.split(":", 2)[2]
+    moods_full = await emoji_config.get_moods_full()
+    moods_full = [m for m in moods_full if m["emoji"] != emoji]
+    await emoji_config.set_moods(moods_full)
+    log.info("emoji_removed emoji={} user_id={}", emoji, update.effective_user.id)
+    await query.edit_message_text(f"✓ Removed {emoji}")
+
+    return await _show_settings_menu(update, context)
+
+
 # ── /stats ──────────────────────────────────────────────
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     stats = await db.get_stats()
     log.debug("stats_retrieved user_id={} total={} this_month={} streak={}", update.effective_user.id, stats["total"], stats["this_month"], stats["current_streak"])
 
+    mood_labels = await emoji_config.get_mood_labels()
     mood_lines = []
     for mood, count in sorted(stats["mood_dist"].items(), key=lambda x: -x[1]):
-        label = MOOD_LABELS.get(mood, "?")
+        label = mood_labels.get(mood, "?")
         mood_lines.append(f"  {mood} {label}: {count}")
 
     text = (
@@ -897,7 +1110,7 @@ async def view_entry_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.edit_message_text("Entry not found.")
         return
 
-    text = format_entry(
+    text = await format_entry(
         db_to_local(entry["created_at"]),
         entry["mood"],
         entry["thought"],
@@ -954,7 +1167,7 @@ async def search_result_callback(update: Update, context: ContextTypes.DEFAULT_T
         await query.edit_message_text("Entry not found.")
         return
 
-    text = format_entry(
+    text = await format_entry(
         db_to_local(entry["created_at"]),
         entry["mood"],
         entry["thought"],
@@ -980,7 +1193,7 @@ async def send_memories(context):
     log.info("memory_check month={} day={} found_entries={}", now.month, now.day, len(entries))
 
     for entry in entries:
-        text = format_memory(
+        text = await format_memory(
             db_to_local(entry["created_at"]),
             entry["mood"],
             entry["thought"],

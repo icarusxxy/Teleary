@@ -38,6 +38,10 @@ from handlers import (
     cmd_settings,
     settings_select_callback,
     settings_value_receive,
+    emoji_settings_main_callback,
+    emoji_add_receive,
+    emoji_edit_receive,
+    emoji_remove_confirm_callback,
     cmd_stats,
     cmd_list,
     list_more_callback,
@@ -59,6 +63,10 @@ from handlers import (
     EDIT_SEARCH,
     EDIT_KEYWORD,
     EDIT_DATE,
+    EMOJI_SETTINGS_MAIN,
+    EMOJI_ADD,
+    EMOJI_REMOVE,
+    EMOJI_EDIT,
 )
 from scheduler import init_scheduler
 
@@ -174,6 +182,20 @@ def main():
                 cancel_cb,
             ],
             SETTINGS_VALUE: [MessageHandler(filters.TEXT & ~filters.COMMAND, settings_value_receive)],
+            EMOJI_SETTINGS_MAIN: [
+                CallbackQueryHandler(emoji_settings_main_callback, pattern=r"^emojiset:"),
+                cancel_cb,
+            ],
+            EMOJI_ADD: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, emoji_add_receive),
+            ],
+            EMOJI_EDIT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, emoji_edit_receive),
+            ],
+            EMOJI_REMOVE: [
+                CallbackQueryHandler(emoji_remove_confirm_callback, pattern=r"^emojiset:"),
+                cancel_cb,
+            ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )

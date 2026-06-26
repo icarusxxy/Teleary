@@ -1,7 +1,8 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from config import TIMEZONE, MOOD_LABELS
+from config import TIMEZONE
+import emoji_config
 
 
 def get_now() -> datetime:
@@ -75,13 +76,15 @@ def db_to_local_date(utc_str: str) -> str:
     return db_to_local(utc_str).strftime("%Y-%m-%d")
 
 
-def format_entry(date: datetime, mood: str, thought: str) -> str:
-    label = MOOD_LABELS.get(mood, "")
+async def format_entry(date: datetime, mood: str, thought: str) -> str:
+    mood_labels = await emoji_config.get_mood_labels()
+    label = mood_labels.get(mood, "")
     return f"{mood} {label} — {date.strftime('%Y-%m-%d %H:%M')}\n\n{thought}"
 
 
-def format_memory(date: datetime, mood: str, thought: str) -> str:
-    label = MOOD_LABELS.get(mood, "")
+async def format_memory(date: datetime, mood: str, thought: str) -> str:
+    mood_labels = await emoji_config.get_mood_labels()
+    label = mood_labels.get(mood, "")
     years_ago = get_now().year - date.year
     suffix = "year" if years_ago == 1 else "years"
     header = f"🗓 {years_ago} {suffix} ago — {date.strftime('%Y-%m-%d')}"
