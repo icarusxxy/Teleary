@@ -16,7 +16,7 @@ _bot = None
 _chat_id = None
 
 
-def init_scheduler(bot, chat_id: int):
+def init_scheduler(bot, chat_id: int | None):
     global _bot, _chat_id
     _bot = bot
     _chat_id = chat_id

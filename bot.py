@@ -65,9 +65,8 @@ from scheduler import init_scheduler
 async def post_init(application: Application):
     log.info("Initializing bot: opening database and starting scheduler")
     await db.get_db()
-    chat_id = (await application.bot.get_me()).id
-    init_scheduler(application.bot, chat_id)
-    log.info("Bot initialized, chat_id={}", chat_id)
+    init_scheduler(application.bot, None)
+    log.info("Bot initialized")
 
 
 async def post_shutdown(application: Application):
