@@ -10,6 +10,9 @@ from telegram.ext import (
 
 from config import BOT_TOKEN
 import database as db
+
+log = logger.bind(module="bot")
+
 from handlers import (
     cmd_start,
     receive_entry,
@@ -54,13 +57,17 @@ from scheduler import init_scheduler
 
 
 async def post_init(application: Application):
+    log.info("Initializing bot: opening database and starting scheduler")
     await db.get_db()
     chat_id = (await application.bot.get_me()).id
     init_scheduler(application.bot, chat_id)
+    log.info("Bot initialized, chat_id={}", chat_id)
 
 
 async def post_shutdown(application: Application):
+    log.info("Shutting down: closing database")
     await db.close_db()
+    log.info("Shutdown complete")
 
 
 def main():
@@ -165,7 +172,7 @@ def main():
     app.post_init = post_init
     app.post_shutdown = post_shutdown
 
-    logger.info("Bot starting...")
+    log.info("Starting bot with polling")
     app.run_polling()
 
 

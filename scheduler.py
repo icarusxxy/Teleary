@@ -4,10 +4,12 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from zoneinfo import ZoneInfo
 
+from loguru import logger
 from config import TIMEZONE, REMINDER_POOL
 import database as db
 from utils import get_now
 
+log = logger.bind(module="scheduler")
 
 scheduler = AsyncIOScheduler(timezone=ZoneInfo(TIMEZONE))
 _bot = None
@@ -34,6 +36,7 @@ def init_scheduler(bot, chat_id: int):
     )
 
     scheduler.start()
+    log.info("scheduler_started chat_id={}", chat_id)
 
 
 def set_chat_id(chat_id: int):
@@ -53,6 +56,11 @@ async def _random_reminder():
         if random.random() < 0.30:
             msg = random.choice(REMINDER_POOL)
             await _bot.send_message(chat_id=_chat_id, text=msg)
+            log.info("reminder_sent hour={} message='{}'", now.hour, msg[:40])
+        else:
+            log.debug("reminder_skipped hour={} probability_miss", now.hour)
+    else:
+        log.debug("reminder_outside_window hour={} window={}-{}", now.hour, start, end)
 
 
 async def _daily_memory():
@@ -63,8 +71,10 @@ async def _daily_memory():
     memory_time = await db.get_setting("memory_time") or "09:00"
     h, m = map(int, memory_time.split(":"))
     if now.hour != h:
+        log.debug("memory_skip hour={} scheduled_hour={}", now.hour, h)
         return
 
+    log.info("memory_fired hour={}", now.hour)
     from handlers import send_memories
 
     class FakeContext:

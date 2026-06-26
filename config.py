@@ -1,11 +1,23 @@
 import os
+import sys
 from dotenv import load_dotenv
+from loguru import logger
 
 load_dotenv()
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 TIMEZONE = os.getenv("TIMEZONE", "Asia/Taipei")
 DB_PATH = os.getenv("DB_PATH", "diary.db")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+
+logger.remove()
+logger.add(
+    sys.stderr,
+    level=LOG_LEVEL,
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{extra[module]}</cyan>:<cyan>{function}</cyan> | {message}",
+    colorize=True,
+)
+logger = logger.bind(module="config")
 
 MOODS = ["😊", "😢", "😐", "😤", "😴"]
 MOOD_LABELS = {

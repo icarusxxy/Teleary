@@ -2,7 +2,10 @@ import aiosqlite
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
+from loguru import logger
 from config import DB_PATH, TIMEZONE
+
+log = logger.bind(module="database")
 
 _db: aiosqlite.Connection | None = None
 
@@ -10,21 +13,26 @@ _db: aiosqlite.Connection | None = None
 async def get_db() -> aiosqlite.Connection:
     global _db
     if _db is None:
+        log.debug("db_connecting path={}", DB_PATH)
         _db = await aiosqlite.connect(DB_PATH)
         _db.row_factory = aiosqlite.Row
         await _db.execute("PRAGMA journal_mode=WAL")
         await _init_schema(_db)
+        log.info("db_connected path={}", DB_PATH)
     return _db
 
 
 async def close_db():
     global _db
     if _db:
+        log.debug("db_closing")
         await _db.close()
         _db = None
+        log.info("db_closed")
 
 
 async def _init_schema(db: aiosqlite.Connection):
+    log.debug("db_schema_init")
     await db.executescript("""
         CREATE TABLE IF NOT EXISTS entries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +57,9 @@ async def save_entry(message_id: int, mood: str, thought: str) -> int:
         (message_id, mood, thought),
     )
     await db.commit()
-    return cursor.lastrowid
+    entry_id = cursor.lastrowid
+    log.debug("db_save_entry entry_id={} mood={} text_len={}", entry_id, mood, len(thought))
+    return entry_id
 
 
 async def get_entry(entry_id: int) -> dict | None:
@@ -105,6 +115,7 @@ async def search_entries(query: str, limit: int = 20) -> list[dict]:
         (f"%{query}%", limit),
     )
     rows = await cursor.fetchall()
+    log.debug("db_search query='{}' result_count={}", query, len(rows))
     return [dict(r) for r in rows]
 
 
@@ -122,12 +133,14 @@ async def update_entry(entry_id: int, mood: str | None = None, thought: str | No
     vals.append(entry_id)
     await db.execute(f"UPDATE entries SET {', '.join(sets)} WHERE id = ?", vals)
     await db.commit()
+    log.debug("db_update_entry entry_id={} fields={}", entry_id, [s.split(" =")[0] for s in sets])
 
 
 async def delete_entry(entry_id: int):
     db = await get_db()
     await db.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
     await db.commit()
+    log.debug("db_delete_entry entry_id={}", entry_id)
 
 
 async def get_entries_by_date(target_date: date) -> list[dict]:
