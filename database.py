@@ -140,6 +140,17 @@ async def get_entries_by_date(target_date: date) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+async def get_entries_by_date_pattern(pattern: str) -> list[dict]:
+    """Search entries by date pattern (YYYY, YYYY-MM, or YYYY-MM-DD)."""
+    db = await get_db()
+    cursor = await db.execute(
+        "SELECT * FROM entries WHERE created_at LIKE ? ORDER BY created_at DESC",
+        (f"{pattern}%",),
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
 async def get_entries_on_this_day(month: int, day: int) -> list[dict]:
     tz = ZoneInfo(TIMEZONE)
     now = datetime.now(tz)

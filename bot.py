@@ -20,6 +20,9 @@ from handlers import (
     edit_text_receive,
     edit_text_skip,
     cmd_delete,
+    delete_search_callback,
+    delete_keyword_receive,
+    delete_date_receive,
     delete_select_callback,
     delete_confirm_callback,
     cmd_import,
@@ -43,6 +46,9 @@ from handlers import (
     IMPORT_MOOD,
     SETTINGS_SELECT,
     SETTINGS_VALUE,
+    DELETE_SEARCH,
+    DELETE_KEYWORD,
+    DELETE_DATE,
 )
 from scheduler import init_scheduler
 
@@ -100,6 +106,16 @@ def main():
     delete_conv = ConversationHandler(
         entry_points=[CommandHandler("delete", cmd_delete)],
         states={
+            DELETE_SEARCH: [
+                CallbackQueryHandler(delete_search_callback, pattern=r"^delsearch:"),
+                cancel_cb,
+            ],
+            DELETE_KEYWORD: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, delete_keyword_receive),
+            ],
+            DELETE_DATE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, delete_date_receive),
+            ],
             EDIT_SELECT: [
                 CallbackQueryHandler(delete_select_callback, pattern=r"^del:"),
                 cancel_cb,

@@ -20,6 +20,7 @@ from scheduler import set_chat_id
 MOOD_PICK, ENTRY_TEXT, EDIT_SELECT, EDIT_MOOD, EDIT_TEXT = range(5)
 IMPORT_DATE, IMPORT_MOOD = range(5, 7)
 SETTINGS_SELECT, SETTINGS_VALUE = range(7, 9)
+DELETE_SEARCH, DELETE_KEYWORD, DELETE_DATE = range(9, 12)
 
 CANCEL = "cancel"
 
@@ -227,12 +228,68 @@ async def edit_text_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── /delete ─────────────────────────────────────────────
 
 async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    entries = await db.get_recent_entries(10)
-    if not entries:
-        await update.message.reply_text("No entries to delete.")
+    keyboard = [
+        [InlineKeyboardButton("🔍 Search by keyword", callback_data="delsearch:keyword")],
+        [InlineKeyboardButton("📅 Search by date", callback_data="delsearch:date")],
+        [InlineKeyboardButton("📋 Recent entries", callback_data="delsearch:recent")],
+        [InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)],
+    ]
+    await update.message.reply_text(
+        "How would you like to find the entry to delete?",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return DELETE_SEARCH
+
+
+async def delete_search_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == CANCEL:
+        await query.edit_message_text("Cancelled.")
         return ConversationHandler.END
 
-    context.user_data["delete_entries"] = entries
+    search_type = query.data.split(":", 1)[1]
+
+    if search_type == "keyword":
+        await query.edit_message_text("Enter a keyword to search for:")
+        return DELETE_KEYWORD
+    elif search_type == "date":
+        await query.edit_message_text(
+            "Enter a date (YYYY, YYYY-MM, or YYYY-MM-DD):"
+        )
+        return DELETE_DATE
+    elif search_type == "recent":
+        entries = await db.get_recent_entries(10)
+        if not entries:
+            await query.edit_message_text("No entries to delete.")
+            return ConversationHandler.END
+
+        context.user_data["delete_entries"] = entries
+        keyboard = [
+            [InlineKeyboardButton(
+                f"{e['mood']} {db_to_local_date(e['created_at'])} — {e['thought'][:30]}...",
+                callback_data=f"del:{e['id']}",
+            )]
+            for e in entries
+        ]
+        keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
+        await query.edit_message_text(
+            "Which entry do you want to delete?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return EDIT_SELECT
+
+
+async def delete_keyword_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query_text = update.message.text
+    entries = await db.search_entries(query_text, limit=20)
+
+    if not entries:
+        await update.message.reply_text(f'No entries matching "{query_text}".')
+        return ConversationHandler.END
+
+    context.user_data["delete_entries"] = {e["id"]: e for e in entries}
     keyboard = [
         [InlineKeyboardButton(
             f"{e['mood']} {db_to_local_date(e['created_at'])} — {e['thought'][:30]}...",
@@ -242,7 +299,40 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
     await update.message.reply_text(
-        "Which entry do you want to delete?",
+        f'🔍 {len(entries)} result(s) for "{query_text}"\n\nWhich entry do you want to delete?',
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return EDIT_SELECT
+
+
+async def delete_date_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    date_str = update.message.text.strip()
+    
+    # Validate format: YYYY, YYYY-MM, or YYYY-MM-DD
+    import re
+    if not re.match(r"^\d{4}(-\d{2}(-\d{2})?)?$", date_str):
+        await update.message.reply_text(
+            "Invalid date format. Use YYYY, YYYY-MM, or YYYY-MM-DD."
+        )
+        return DELETE_DATE
+
+    entries = await db.get_entries_by_date_pattern(date_str)
+
+    if not entries:
+        await update.message.reply_text(f"No entries found for {date_str}.")
+        return ConversationHandler.END
+
+    context.user_data["delete_entries"] = {e["id"]: e for e in entries}
+    keyboard = [
+        [InlineKeyboardButton(
+            f"{e['mood']} {db_to_local_date(e['created_at'])} — {e['thought'][:30]}...",
+            callback_data=f"del:{e['id']}",
+        )]
+        for e in entries
+    ]
+    keyboard.append([InlineKeyboardButton("✖ Cancel", callback_data=CANCEL)])
+    await update.message.reply_text(
+        f"📅 {len(entries)} entry(ies) for {date_str}\n\nWhich entry do you want to delete?",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return EDIT_SELECT
