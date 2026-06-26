@@ -47,6 +47,7 @@ from handlers import (
     list_more_callback,
     view_entry_callback,
     cmd_search,
+    cmd_random,
     search_result_callback,
     cancel,
     MOOD_PICK,
@@ -204,6 +205,7 @@ def main():
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("list", cmd_list))
     app.add_handler(CommandHandler("search", cmd_search))
+    app.add_handler(CommandHandler("random", cmd_random))
     app.add_handler(CallbackQueryHandler(list_more_callback, pattern=r"^list(prev|next)$"))
     app.add_handler(CallbackQueryHandler(view_entry_callback, pattern=r"^view:"))
     app.add_handler(CallbackQueryHandler(search_result_callback, pattern=r"^srch:"))

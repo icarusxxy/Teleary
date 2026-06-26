@@ -182,6 +182,13 @@ async def get_entries_on_this_day(month: int, day: int) -> list[dict]:
     return results
 
 
+async def get_random_entry() -> dict | None:
+    db = await get_db()
+    cursor = await db.execute("SELECT * FROM entries ORDER BY RANDOM() LIMIT 1")
+    row = await cursor.fetchone()
+    return dict(row) if row else None
+
+
 async def get_stats() -> dict:
     db = await get_db()
 

@@ -59,12 +59,14 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Send me any message — text, photo, video, or album — and I'll help you log it with a mood.\n\n"
         "Commands:\n"
         "/list — Browse your entries\n"
+        "/random — Get a random diary entry\n"
         "/search <text> — Search your diary\n"
         "/edit — Edit a past entry\n"
         "/delete — Delete a past entry\n"
         "/import YYYY-MM-DD — Import a past entry\n"
-        "/settings — Configure reminders, memory & emojis\n"
-        "/stats — View your journaling stats"
+        "/settings — Configure reminders, memory & mood\n"
+        "/stats — View your journaling stats\n"
+        "/cancel — Cancel current action"
     )
 
 
@@ -1181,6 +1183,32 @@ async def search_result_callback(update: Update, context: ContextTypes.DEFAULT_T
             await query.message.reply_text(text)
     else:
         await query.message.reply_text(text)
+
+
+# ── /random ─────────────────────────────────────────────
+
+async def cmd_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    entry = await db.get_random_entry()
+    if not entry:
+        await update.message.reply_text(
+            "No diary entries yet. Start writing by sending me a message! \U0001f4dd"
+        )
+        return
+
+    text = await format_entry(
+        db_to_local(entry["created_at"]),
+        entry["mood"],
+        entry["thought"],
+    )
+
+    if entry["message_id"]:
+        try:
+            await update.message.reply_text(text, reply_to_message_id=entry["message_id"])
+        except Exception as e:
+            log.warning("random_reply_failed entry_id={} error={}", entry["id"], str(e))
+            await update.message.reply_text(text)
+    else:
+        await update.message.reply_text(text)
 
 
 # ── Memory (called by scheduler) ────────────────────────
