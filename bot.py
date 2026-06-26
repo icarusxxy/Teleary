@@ -18,6 +18,9 @@ from handlers import (
     receive_entry,
     mood_callback,
     cmd_edit,
+    edit_search_callback,
+    edit_keyword_receive,
+    edit_date_receive,
     edit_select_callback,
     edit_mood_callback,
     edit_text_receive,
@@ -52,6 +55,9 @@ from handlers import (
     DELETE_SEARCH,
     DELETE_KEYWORD,
     DELETE_DATE,
+    EDIT_SEARCH,
+    EDIT_KEYWORD,
+    EDIT_DATE,
 )
 from scheduler import init_scheduler
 
@@ -94,6 +100,16 @@ def main():
     edit_conv = ConversationHandler(
         entry_points=[CommandHandler("edit", cmd_edit)],
         states={
+            EDIT_SEARCH: [
+                CallbackQueryHandler(edit_search_callback, pattern=r"^editsearch:"),
+                cancel_cb,
+            ],
+            EDIT_KEYWORD: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, edit_keyword_receive),
+            ],
+            EDIT_DATE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, edit_date_receive),
+            ],
             EDIT_SELECT: [
                 CallbackQueryHandler(edit_select_callback, pattern=r"^edit:"),
                 cancel_cb,
