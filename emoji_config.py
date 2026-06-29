@@ -53,15 +53,29 @@ async def _get_raw_moods() -> str | None:
     return _raw_moods_cache
 
 
-async def get_moods() -> list[str]:
+async def _load_moods() -> list[dict] | None:
+    """Load custom moods from DB, returns None if none configured or invalid."""
     raw = await _get_raw_moods()
     if raw:
         try:
-            items = json.loads(raw)
-            return [item["emoji"] for item in items]
+            return json.loads(raw)
         except (json.JSONDecodeError, KeyError):
             log.warning("invalid_moods_json_falling_back_to_defaults")
-    return [item["emoji"] for item in DEFAULT_MOODS]
+    return None
+
+
+async def _resolve_label(item: dict, lang: str) -> str:
+    """Resolve display label: i18n key for default emojis, stored label for custom ones."""
+    if item["emoji"] in MOOD_KEYS:
+        return await get_text(MOOD_KEYS[item["emoji"]], lang)
+    return item["label"]
+
+
+async def get_moods() -> list[str]:
+    items = await _load_moods()
+    if items is None:
+        items = DEFAULT_MOODS
+    return [item["emoji"] for item in items]
 
 
 async def get_mood_labels(lang: str = "eng") -> dict[str, str]:
@@ -71,39 +85,20 @@ async def get_mood_labels(lang: str = "eng") -> dict[str, str]:
     For custom user-added emojis, uses the label stored at creation time.
     This lets default moods translate automatically while custom ones stay as-is.
     """
-    raw = await _get_raw_moods()
-    if raw:
-        try:
-            items = json.loads(raw)
-            labels = {}
-            for item in items:
-                emoji = item["emoji"]
-                if emoji in MOOD_KEYS:
-                    labels[emoji] = await get_text(MOOD_KEYS[emoji], lang)
-                else:
-                    labels[emoji] = item["label"]
-            return labels
-        except (json.JSONDecodeError, KeyError):
-            log.warning("invalid_mood_labels_json_falling_back_to_defaults")
-    return {item["emoji"]: await get_text(MOOD_KEYS.get(item["emoji"], ""), lang) or item["label"] for item in DEFAULT_MOODS}
+    items = await _load_moods()
+    if items is None:
+        items = DEFAULT_MOODS
+    return {item["emoji"]: await _resolve_label(item, lang) for item in items}
 
 
 async def get_moods_full(lang: str = "eng") -> list[dict]:
-    raw = await _get_raw_moods()
-    if raw:
-        try:
-            items = json.loads(raw)
-            result = []
-            for item in items:
-                emoji = item["emoji"]
-                if emoji in MOOD_KEYS:
-                    result.append({"emoji": emoji, "label": await get_text(MOOD_KEYS[emoji], lang)})
-                else:
-                    result.append(item)
-            return result
-        except (json.JSONDecodeError, KeyError):
-            log.warning("invalid_moods_json_falling_back_to_defaults")
-    return [{"emoji": item["emoji"], "label": await get_text(MOOD_KEYS.get(item["emoji"], ""), lang) or item["label"]} for item in DEFAULT_MOODS]
+    items = await _load_moods()
+    if items is None:
+        items = DEFAULT_MOODS
+    result = []
+    for item in items:
+        result.append({"emoji": item["emoji"], "label": await _resolve_label(item, lang)})
+    return result
 
 
 async def set_moods(moods: list[dict]):
@@ -113,4 +108,4 @@ async def set_moods(moods: list[dict]):
 
 
 async def get_default_moods_full(lang: str = "eng") -> list[dict]:
-    return [{"emoji": item["emoji"], "label": await get_text(MOOD_KEYS.get(item["emoji"], ""), lang) or item["label"]} for item in DEFAULT_MOODS]
+    return [{"emoji": item["emoji"], "label": await _resolve_label(item, lang)} for item in DEFAULT_MOODS]

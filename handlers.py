@@ -72,6 +72,25 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+async def _mood_keyboard(lang: str, callback_prefix: str = "mood") -> InlineKeyboardMarkup:
+    moods = await emoji_config.get_moods()
+    keyboard = [[InlineKeyboardButton(m, callback_data=f"{callback_prefix}:{m}")] for m in moods]
+    keyboard.append([InlineKeyboardButton(await get_text("cancel", lang), callback_data=CANCEL)])
+    return InlineKeyboardMarkup(keyboard)
+
+
+async def _reply_to_entry(where, entry: dict, text: str, entry_id: int):
+    """Reply to an entry's original message, falling back to a plain reply."""
+    if entry.get("message_id"):
+        try:
+            await where.reply_text(text, reply_to_message_id=entry["message_id"])
+        except Exception as e:
+            log.warning("reply_to_original_failed entry_id={} error={}", entry_id, str(e))
+            await where.reply_text(text)
+    else:
+        await where.reply_text(text)
+
+
 # ── /start ──────────────────────────────────────────────
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -109,12 +128,9 @@ async def receive_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["pending_message_id"] = msg.message_id
 
     lang = await _lang(update)
-    moods = await emoji_config.get_moods()
-    keyboard = [[InlineKeyboardButton(m, callback_data=f"mood:{m}")] for m in moods]
-    keyboard.append([InlineKeyboardButton(await get_text("cancel", lang), callback_data=CANCEL)])
     await msg.reply_text(
         await get_text("how_are_you_feeling", lang),
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        reply_markup=await _mood_keyboard(lang),
     )
     return MOOD_PICK
 
@@ -158,12 +174,9 @@ async def _handle_media_group(update: Update, context: ContextTypes.DEFAULT_TYPE
         context.user_data["pending_media_group_ids"] = message_ids
 
         lang = await _lang(first_msg)
-        moods = await emoji_config.get_moods()
-        keyboard = [[InlineKeyboardButton(m, callback_data=f"mood:{m}")] for m in moods]
-        keyboard.append([InlineKeyboardButton(await get_text("cancel", lang), callback_data=CANCEL)])
         await first_msg.reply_text(
             await get_text("album_items_how_feeling", lang, count=len(messages)),
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            reply_markup=await _mood_keyboard(lang),
         )
 
     if group_id not in _media_group_locks:
@@ -583,10 +596,7 @@ async def import_text_receive(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data["import_text"] = update.message.text
     context.user_data["import_message_id"] = update.message.message_id
     lang = await _lang(update)
-    moods = await emoji_config.get_moods()
-    keyboard = [[InlineKeyboardButton(m, callback_data=f"imood:{m}")] for m in moods]
-    keyboard.append([InlineKeyboardButton(await get_text("cancel", lang), callback_data=CANCEL)])
-    await update.message.reply_text(await get_text("import_pick_mood", lang), reply_markup=InlineKeyboardMarkup(keyboard))
+    await update.message.reply_text(await get_text("import_pick_mood", lang), reply_markup=await _mood_keyboard(lang, "imood"))
     return IMPORT_MOOD
 
 
@@ -621,12 +631,9 @@ async def import_media_receive(update: Update, context: ContextTypes.DEFAULT_TYP
             context.user_data["import_media_group_ids"] = message_ids
 
             lang = await _lang(first_msg)
-            moods = await emoji_config.get_moods()
-            keyboard = [[InlineKeyboardButton(m, callback_data=f"imood:{m}")] for m in moods]
-            keyboard.append([InlineKeyboardButton(await get_text("cancel", lang), callback_data=CANCEL)])
             await first_msg.reply_text(
                 await get_text("import_album_pick_mood", lang, count=len(messages)),
-                reply_markup=InlineKeyboardMarkup(keyboard),
+                reply_markup=await _mood_keyboard(lang, "imood"),
             )
 
         if group_id not in _media_group_locks:
@@ -637,10 +644,7 @@ async def import_media_receive(update: Update, context: ContextTypes.DEFAULT_TYP
         context.user_data["import_message_id"] = msg.message_id
 
         lang = await _lang(msg)
-        moods = await emoji_config.get_moods()
-        keyboard = [[InlineKeyboardButton(m, callback_data=f"imood:{m}")] for m in moods]
-        keyboard.append([InlineKeyboardButton(await get_text("cancel", lang), callback_data=CANCEL)])
-        await msg.reply_text(await get_text("import_pick_mood", lang), reply_markup=InlineKeyboardMarkup(keyboard))
+        await msg.reply_text(await get_text("import_pick_mood", lang), reply_markup=await _mood_keyboard(lang, "imood"))
         return IMPORT_MOOD
 
     return IMPORT_MOOD
@@ -1175,11 +1179,11 @@ async def list_more_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 )
 
 
-def _build_entry_buttons(entries: list[dict]) -> list[list[InlineKeyboardButton]]:
+def _build_entry_buttons(entries: list[dict], callback_prefix: str = "view", truncate: int = 40) -> list[list[InlineKeyboardButton]]:
     return [
         [InlineKeyboardButton(
-            f"{e['mood']} {db_to_local_date(e['created_at'])} — {e['thought'][:40]}{'...' if len(e['thought']) > 40 else ''}",
-            callback_data=f"view:{e['id']}",
+            f"{e['mood']} {db_to_local_date(e['created_at'])} — {e['thought'][:truncate]}{'...' if len(e['thought']) > truncate else ''}",
+            callback_data=f"{callback_prefix}:{e['id']}",
         )]
         for e in entries
     ]
@@ -1204,17 +1208,7 @@ async def view_entry_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         lang=lang,
     )
 
-    # Reply to the original message when possible — this preserves the context
-    # of what the user was writing about when they made the entry. Falls back
-    # to a plain message if the original message was deleted or is too old.
-    if entry["message_id"]:
-        try:
-            await query.message.reply_text(text, reply_to_message_id=entry["message_id"])
-        except Exception as e:
-            log.warning("view_reply_failed entry_id={} error={}", entry_id, str(e))
-            await query.message.reply_text(text)
-    else:
-        await query.message.reply_text(text)
+    await _reply_to_entry(query.message, entry, text, entry_id)
 
 
 # ── /search ─────────────────────────────────────────────
@@ -1234,17 +1228,9 @@ async def cmd_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data["search_entries"] = {e["id"]: e for e in entries}
 
-    keyboard = [
-        [InlineKeyboardButton(
-            f"{e['mood']} {db_to_local_date(e['created_at'])} — {e['thought'][:40]}{'...' if len(e['thought']) > 40 else ''}",
-            callback_data=f"srch:{e['id']}",
-        )]
-        for e in entries
-    ]
-
     await update.message.reply_text(
         await get_text("search_results", lang, count=len(entries), query=query_text),
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        reply_markup=InlineKeyboardMarkup(_build_entry_buttons(entries, "srch")),
     )
 
 
@@ -1267,14 +1253,7 @@ async def search_result_callback(update: Update, context: ContextTypes.DEFAULT_T
         lang=lang,
     )
 
-    if entry["message_id"]:
-        try:
-            await query.message.reply_text(text, reply_to_message_id=entry["message_id"])
-        except Exception as e:
-            log.warning("search_reply_failed entry_id={} error={}", entry_id, str(e))
-            await query.message.reply_text(text)
-    else:
-        await query.message.reply_text(text)
+    await _reply_to_entry(query.message, entry, text, entry_id)
 
 
 # ── /random ─────────────────────────────────────────────
@@ -1293,14 +1272,7 @@ async def cmd_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lang=lang,
     )
 
-    if entry["message_id"]:
-        try:
-            await update.message.reply_text(text, reply_to_message_id=entry["message_id"])
-        except Exception as e:
-            log.warning("random_reply_failed entry_id={} error={}", entry["id"], str(e))
-            await update.message.reply_text(text)
-    else:
-        await update.message.reply_text(text)
+    await _reply_to_entry(update.message, entry, text, entry["id"])
 
 
 # ── /search_by_date ─────────────────────────────────────
@@ -1330,17 +1302,9 @@ async def cmd_search_by_date(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     context.user_data["search_entries"] = {e["id"]: e for e in entries}
 
-    keyboard = [
-        [InlineKeyboardButton(
-            f"{e['mood']} {db_to_local_date(e['created_at'])} — {e['thought'][:40]}{'...' if len(e['thought']) > 40 else ''}",
-            callback_data=f"srch:{e['id']}",
-        )]
-        for e in entries
-    ]
-
     await update.message.reply_text(
         await get_text("search_by_date_results", lang, count=len(entries), pattern=pattern),
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        reply_markup=InlineKeyboardMarkup(_build_entry_buttons(entries, "srch")),
     )
 
 

@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from re import fullmatch
 from zoneinfo import ZoneInfo
 
 from config import TIMEZONE
@@ -18,8 +19,6 @@ def parse_date(raw: str) -> date:
 
     Accepted: YYYY-MM-DD, YYYY/MM/DD, YYYYMMDD
     """
-    from re import fullmatch
-
     cleaned = raw.strip()
 
     # YYYYMMDD (digits only, 8 chars)
@@ -45,8 +44,6 @@ def parse_date_pattern(raw: str) -> str:
     Returns: 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'
     Raises ValueError if the input doesn't match a known pattern.
     """
-    from re import fullmatch
-
     cleaned = raw.strip()
 
     # 4 digits → YYYY
@@ -77,8 +74,6 @@ def parse_time(raw: str) -> tuple[int, int, int]:
 
     Accepted: HHMM, HH:MM (→ HH:MM:00), HHMMSS, HH:MM:SS (→ HH:MM:SS)
     """
-    from re import fullmatch
-
     cleaned = raw.strip()
 
     # HHMM (digits only, 4 chars)
