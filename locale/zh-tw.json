@@ -43,7 +43,7 @@
     "del_results_for": "🔍 找到 {count} 個跟 \"{query}\" 相關的結果\n\n你想刪除哪個呢？",
     "del_invalid_date": "錯誤的日期格式。請使用 YYYY, YYYY-MM, 或 YYYY-MM-DD 查詢。",
     "del_no_entries_for_date": "沒有找到 {date} 的日記。",
-    "del_entries_for": "📅 找到 {count} 個在 {date} 紀錄的日記\n\n你刪除輯哪個呢？",
+    "del_entries_for": "📅 找到 {count} 個在 {date} 紀錄的日記\n\n你想刪除哪個呢？",
     "del_which_entry": "你想刪除哪個呢？",
     "del_not_found": "找不到相關的日記。",
     "del_confirm": "刪除這個日記？\n\n{mood} {date}\n{thought}",

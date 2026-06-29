@@ -222,16 +222,20 @@ async def get_stats() -> dict:
     current_streak = 0
     if dates:
         from datetime import timedelta
+        today = now.date()
         date_objs = [date.fromisoformat(d) for d in dates]
-        # current_streak: count consecutive days ending at today (or yesterday)
-        # by walking backwards from the most recent entry.
-        current_streak = 1
-        for i in range(len(date_objs) - 1, 0, -1):
-            if (date_objs[i] - date_objs[i - 1]).days == 1:
-                current_streak += 1
-            else:
-                break
-        # longest_streak: scan forward to find the maximum consecutive run.
+
+        # Current streak: only counts if the last entry is today or yesterday.
+        last_date = date_objs[-1]
+        if (today - last_date).days <= 1:
+            current_streak = 1
+            for i in range(len(date_objs) - 1, 0, -1):
+                if (date_objs[i] - date_objs[i - 1]).days == 1:
+                    current_streak += 1
+                else:
+                    break
+
+        # Longest streak: scan forward for max consecutive run.
         streak = 1
         run = 1
         for i in range(1, len(date_objs)):
@@ -270,7 +274,8 @@ async def get_settings(keys: list[str]) -> dict[str, str | None]:
         keys,
     )
     rows = await cursor.fetchall()
-    return {row["key"]: row["value"] for row in rows}
+    found = {row["key"]: row["value"] for row in rows}
+    return {key: found.get(key) for key in keys}
 
 
 async def set_setting(key: str, value: str):
