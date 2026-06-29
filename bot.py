@@ -42,6 +42,7 @@ from handlers import (
     emoji_add_receive,
     emoji_edit_receive,
     emoji_remove_confirm_callback,
+    language_select_callback,
     cmd_stats,
     cmd_list,
     list_more_callback,
@@ -69,6 +70,7 @@ from handlers import (
     EMOJI_ADD,
     EMOJI_REMOVE,
     EMOJI_EDIT,
+    LANGUAGE_SELECT,
 )
 from scheduler import init_scheduler
 
@@ -196,6 +198,10 @@ def main():
             ],
             EMOJI_REMOVE: [
                 CallbackQueryHandler(emoji_remove_confirm_callback, pattern=r"^emojiset:"),
+                cancel_cb,
+            ],
+            LANGUAGE_SELECT: [
+                CallbackQueryHandler(language_select_callback, pattern=r"^lang:"),
                 cancel_cb,
             ],
         },

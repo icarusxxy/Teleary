@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo
 
 from config import TIMEZONE
 import emoji_config
+from i18n import get_text
 
 
 def get_now() -> datetime:
@@ -110,16 +111,16 @@ def db_to_local_date(utc_str: str) -> str:
     return db_to_local(utc_str).strftime("%Y-%m-%d")
 
 
-async def format_entry(date: datetime, mood: str, thought: str) -> str:
+async def format_entry(date: datetime, mood: str, thought: str, lang: str = "eng") -> str:
     mood_labels = await emoji_config.get_mood_labels()
     label = mood_labels.get(mood, "")
-    return f"{mood} {label} — {date.strftime('%A, %Y-%m-%d %H:%M')}\n\n{thought}"
+    return get_text("format_entry", lang, mood=mood, label=label, datetime=date.strftime('%A, %Y-%m-%d %H:%M'), thought=thought)
 
 
-async def format_memory(date: datetime, mood: str, thought: str) -> str:
+async def format_memory(date: datetime, mood: str, thought: str, lang: str = "eng") -> str:
     mood_labels = await emoji_config.get_mood_labels()
     label = mood_labels.get(mood, "")
     years_ago = get_now().year - date.year
-    suffix = "year" if years_ago == 1 else "years"
-    header = f"🗓 {years_ago} {suffix} ago — {date.strftime('%A, %Y-%m-%d')}"
+    suffix = get_text("format_memory_year", lang) if years_ago == 1 else get_text("format_memory_years", lang)
+    header = get_text("format_memory_header", lang, years=years_ago, suffix=suffix, date=date.strftime('%A, %Y-%m-%d'))
     return f"{header}\n{mood} {label}\n\n{thought}"

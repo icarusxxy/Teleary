@@ -6,7 +6,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from zoneinfo import ZoneInfo
 
 from loguru import logger
-from config import TIMEZONE, REMINDER_POOL
+from config import TIMEZONE, get_reminder_pool
 import database as db
 from utils import get_now
 
@@ -68,7 +68,9 @@ async def _random_reminder():
 
     if start <= now.hour <= end:
         if random.random() < 0.30:
-            msg = random.choice(REMINDER_POOL)
+            lang = await db.get_setting("language") or "eng"
+            reminder_pool = get_reminder_pool(lang)
+            msg = random.choice(reminder_pool)
             await _bot.send_message(chat_id=_chat_id, text=msg)
             await db.set_setting("last_reminder_sent", now.isoformat())
             log.info("reminder_sent hour={} message='{}'", now.hour, msg[:40])

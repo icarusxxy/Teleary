@@ -20,19 +20,31 @@ logger.add(
 logger = logger.bind(module="config")
 
 MOODS = ["😊", "😢", "😐", "😤", "😴"]
-MOOD_LABELS = {
-    "😊": "Happy",
-    "😢": "Sad",
-    "😐": "Neutral",
-    "😤": "Frustrated",
-    "😴": "Tired",
+
+MOOD_KEYS = {
+    "😊": "mood_happy",
+    "😢": "mood_sad",
+    "😐": "mood_neutral",
+    "😤": "mood_frustrated",
+    "😴": "mood_tired",
 }
 
-REMINDER_POOL = [
-    "Hey, don't forget to write something down today!",
-    "How are you feeling? Take a moment to journal.",
-    "Your diary misses you. Write something!",
-    "A quick entry now = a memory later. Journal!",
-    "What's on your mind? Drop a note in your diary.",
-    "Even one line counts — write something today.",
-]
+
+def get_mood_labels(lang: str = "eng") -> dict[str, str]:
+    from i18n import get_text
+    return {emoji: get_text(key, lang) for emoji, key in MOOD_KEYS.items()}
+
+
+def get_reminder_pool(lang: str = "eng") -> list[str]:
+    from i18n import get_text
+    reminders = get_text("reminder_pool", lang)
+    if isinstance(reminders, list):
+        return reminders
+    return [
+        "Hey, don't forget to write something down today!",
+        "How are you feeling? Take a moment to journal.",
+        "Your diary misses you. Write something!",
+        "A quick entry now = a memory later. Journal!",
+        "What's on your mind? Drop a note in your diary.",
+        "Even one line counts — write something today.",
+    ]
