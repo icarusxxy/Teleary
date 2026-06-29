@@ -116,10 +116,11 @@
     "format_memory_years": "years",
 
     "mood_happy": "Happy",
-    "mood_sad": "Sad",
+    "mood_good": "Good",
     "mood_neutral": "Neutral",
-    "mood_frustrated": "Frustrated",
-    "mood_tired": "Tired",
+    "mood_meh": "Meh",
+    "mood_sad": "Sad",
+    "mood_angry": "Angry",
 
     "reminder_pool": [
         "Hey, don't forget to write something down today!",

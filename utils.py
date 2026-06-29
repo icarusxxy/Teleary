@@ -112,13 +112,13 @@ def db_to_local_date(utc_str: str) -> str:
 
 
 async def format_entry(date: datetime, mood: str, thought: str, lang: str = "eng") -> str:
-    mood_labels = await emoji_config.get_mood_labels()
+    mood_labels = await emoji_config.get_mood_labels(lang)
     label = mood_labels.get(mood, "")
     return get_text("format_entry", lang, mood=mood, label=label, datetime=date.strftime('%A, %Y-%m-%d %H:%M'), thought=thought)
 
 
 async def format_memory(date: datetime, mood: str, thought: str, lang: str = "eng") -> str:
-    mood_labels = await emoji_config.get_mood_labels()
+    mood_labels = await emoji_config.get_mood_labels(lang)
     label = mood_labels.get(mood, "")
     years_ago = get_now().year - date.year
     suffix = get_text("format_memory_year", lang) if years_ago == 1 else get_text("format_memory_years", lang)

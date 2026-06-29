@@ -115,11 +115,12 @@
     "format_memory_year": "年",
     "format_memory_years": "年",
 
-    "mood_happy": "開心",
+    "mood_happy": "開心！",
+    "mood_good": "不錯～",
+    "mood_neutral": "還可以",
+    "mood_meh": "咩",
     "mood_sad": "難過",
-    "mood_neutral": "平静",
-    "mood_frustrated": "生氣",
-    "mood_tired": "疲憊",
+    "mood_angry": "生氣",
 
     "reminder_pool": [
         "別忘記來寫點東西！",

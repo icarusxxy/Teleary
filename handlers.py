@@ -163,7 +163,7 @@ async def mood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     entry_id = await db.save_entry(message_id, mood, text)
     lang = await _lang(update)
-    mood_labels = await emoji_config.get_mood_labels()
+    mood_labels = await emoji_config.get_mood_labels(lang)
     label = mood_labels.get(mood, "")
     log.info("entry_saved entry_id={} mood={} text_len={} user_id={}", entry_id, mood, len(text), update.effective_user.id)
     await query.edit_message_text(get_text("saved_mood", lang, mood=mood, label=label))
@@ -664,7 +664,7 @@ async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     stored = await row.fetchone()
     log.debug("import_stored entry_id={} created_at={}", cursor.lastrowid, stored[0] if stored else "N/A")
 
-    mood_labels = await emoji_config.get_mood_labels()
+    mood_labels = await emoji_config.get_mood_labels(lang)
     label = mood_labels.get(mood, "")
     log.info("entry_imported entry_id={} mood={} target_dt={} user_id={}", cursor.lastrowid, mood, target_dt, update.effective_user.id)
     media_count = f" ({len(media_ids)} items)" if media_ids else ""
@@ -828,7 +828,7 @@ async def language_select_callback(update: Update, context: ContextTypes.DEFAULT
 
 async def _show_emoji_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = await _lang(update)
-    moods_full = await emoji_config.get_moods_full()
+    moods_full = await emoji_config.get_moods_full(lang)
     text_lines = [get_text("emoji_current", lang)]
     keyboard = []
 
@@ -871,7 +871,8 @@ async def emoji_settings_main_callback(update: Update, context: ContextTypes.DEF
         return EMOJI_ADD
 
     if action == "reset":
-        default_list = "\n".join(f"  {m['emoji']} {m['label']}" for m in emoji_config.DEFAULT_MOODS)
+        default_moods = emoji_config.get_default_moods_full(lang)
+        default_list = "\n".join(f"  {m['emoji']} {m['label']}" for m in default_moods)
         keyboard = [
             [
                 InlineKeyboardButton(get_text("yes_reset", lang), callback_data="emojiset:confirmreset"),
@@ -886,7 +887,7 @@ async def emoji_settings_main_callback(update: Update, context: ContextTypes.DEF
 
     if action.startswith("edit:"):
         emoji = action.split(":", 1)[1]
-        moods_full = await emoji_config.get_moods_full()
+        moods_full = await emoji_config.get_moods_full(lang)
         item = next((m for m in moods_full if m["emoji"] == emoji), None)
         if not item:
             await query.edit_message_text(get_text("emoji_not_found", lang))
@@ -900,7 +901,7 @@ async def emoji_settings_main_callback(update: Update, context: ContextTypes.DEF
 
     if action.startswith("remove:"):
         emoji = action.split(":", 1)[1]
-        moods_full = await emoji_config.get_moods_full()
+        moods_full = await emoji_config.get_moods_full(lang)
         item = next((m for m in moods_full if m["emoji"] == emoji), None)
         if not item:
             await query.edit_message_text(get_text("emoji_not_found", lang))
@@ -1013,7 +1014,7 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = await _lang(update)
     log.debug("stats_retrieved user_id={} total={} this_month={} streak={}", update.effective_user.id, stats["total"], stats["this_month"], stats["current_streak"])
 
-    mood_labels = await emoji_config.get_mood_labels()
+    mood_labels = await emoji_config.get_mood_labels(lang)
     mood_lines = []
     for mood, count in sorted(stats["mood_dist"].items(), key=lambda x: -x[1]):
         label = mood_labels.get(mood, "?")

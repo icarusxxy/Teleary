@@ -19,21 +19,6 @@ logger.add(
 )
 logger = logger.bind(module="config")
 
-MOODS = ["😊", "😢", "😐", "😤", "😴"]
-
-MOOD_KEYS = {
-    "😊": "mood_happy",
-    "😢": "mood_sad",
-    "😐": "mood_neutral",
-    "😤": "mood_frustrated",
-    "😴": "mood_tired",
-}
-
-
-def get_mood_labels(lang: str = "eng") -> dict[str, str]:
-    from i18n import get_text
-    return {emoji: get_text(key, lang) for emoji, key in MOOD_KEYS.items()}
-
 
 def get_reminder_pool(lang: str = "eng") -> list[str]:
     from i18n import get_text
