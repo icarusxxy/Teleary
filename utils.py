@@ -133,3 +133,33 @@ async def format_memory(date: datetime, mood: str, thought: str, lang: str = "en
     suffix = await get_text("format_memory_year", lang) if years_ago == 1 else await get_text("format_memory_years", lang)
     header = await get_text("format_memory_header", lang, years=years_ago, suffix=suffix, date=date.strftime('%A, %Y-%m-%d'))
     return f"{header}\n{mood} {label}\n\n{thought}"
+
+
+async def safe_db_operation(operation, error_key: str, lang: str, update) -> any:
+    """Execute database operation with error handling.
+    
+    Args:
+        operation: Async callable to execute
+        error_key: i18n key for error message
+        lang: Language code
+        update: Telegram Update object for sending replies
+        
+    Returns:
+        Result of operation or None if error occurred
+    """
+    from loguru import logger
+    log = logger.bind(module="utils")
+    
+    try:
+        return await operation()
+    except Exception as e:
+        log.error("db_operation_failed error={}", str(e))
+        try:
+            if update.message:
+                await update.message.reply_text(await get_text(error_key, lang))
+            elif update.callback_query:
+                await update.callback_query.answer()
+                await update.callback_query.edit_message_text(await get_text(error_key, lang))
+        except Exception as reply_error:
+            log.error("reply_failed error={}", str(reply_error))
+        return None

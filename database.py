@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 from loguru import logger
 from config import DB_PATH, TIMEZONE
+from cache import get_cached_setting, cache_setting, invalidate_setting
 
 log = logger.bind(module="database")
 
@@ -46,7 +47,14 @@ async def _init_schema(db: aiosqlite.Connection):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
+        -- Index for sorting by creation time
         CREATE INDEX IF NOT EXISTS idx_entries_created_at ON entries(created_at);
+        
+        -- Index for date-based queries (used by get_entries_by_date, get_entries_on_this_day)
+        CREATE INDEX IF NOT EXISTS idx_entries_date ON entries(strftime('%Y-%m-%d', created_at));
+        
+        -- Index for mood-based queries (used by get_stats)
+        CREATE INDEX IF NOT EXISTS idx_entries_mood ON entries(mood);
 
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
@@ -120,11 +128,20 @@ async def get_entries_before(year: int, month: int, limit: int = 10, offset: int
     return [dict(r) for r in rows]
 
 
+def escape_like(string: str) -> str:
+    """Escape special characters for SQLite LIKE patterns.
+    
+    LIKE patterns use % and _ as wildcards. If user input contains these
+    characters, they should be treated as literals, not wildcards.
+    """
+    return string.replace('%', '\\%').replace('_', '\\_')
+
+
 async def search_entries(query: str, limit: int = 20) -> list[dict]:
     db = await get_db()
     cursor = await db.execute(
-        "SELECT * FROM entries WHERE thought LIKE ? ORDER BY created_at DESC LIMIT ?",
-        (f"%{query}%", limit),
+        "SELECT * FROM entries WHERE thought LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT ?",
+        (f"%{escape_like(query)}%", limit),
     )
     rows = await cursor.fetchall()
     log.debug("db_search query='{}' result_count={}", query, len(rows))
@@ -261,10 +278,21 @@ async def get_stats() -> dict:
 
 
 async def get_setting(key: str) -> str | None:
+    # Check cache first
+    cached = get_cached_setting(key)
+    if cached is not None:
+        return cached
+    
     db = await get_db()
     cursor = await db.execute("SELECT value FROM settings WHERE key = ?", (key,))
     row = await cursor.fetchone()
-    return row["value"] if row else None
+    value = row["value"] if row else None
+    
+    # Cache the result
+    if value is not None:
+        cache_setting(key, value)
+    
+    return value
 
 
 async def get_settings(keys: list[str]) -> dict[str, str | None]:
@@ -291,3 +319,6 @@ async def set_setting(key: str, value: str):
         (key, value),
     )
     await db.commit()
+    
+    # Invalidate cache for this key
+    invalidate_setting(key)

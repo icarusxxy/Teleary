@@ -15,6 +15,7 @@ import database as db
 from i18n import get_text, get_lang_for_user
 from utils import db_to_local, db_to_local_date, format_entry, format_memory, get_now, parse_date, parse_date_pattern, parse_time
 from scheduler import set_chat_id
+from validators import validate_date_input, validate_reminder_window, validate_memory_time
 
 log = logger.bind(module="handlers")
 
@@ -281,9 +282,10 @@ async def edit_date_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
     date_str = update.message.text.strip()
     lang = await _lang(update)
     
-    # Validate format: YYYY, YYYY-MM, or YYYY-MM-DD
-    if not re.match(r"^\d{4}(-\d{2}(-\d{2})?)?$", date_str):
-        await update.message.reply_text(await get_text("edit_invalid_date", lang))
+    # Validate date input
+    is_valid, error_msg = validate_date_input(date_str)
+    if not is_valid:
+        await update.message.reply_text(error_msg)
         return EDIT_DATE
 
     entries = await db.get_entries_by_date_pattern(date_str)
@@ -474,10 +476,11 @@ async def delete_date_receive(update: Update, context: ContextTypes.DEFAULT_TYPE
     date_str = update.message.text.strip()
     lang = await _lang(update)
     
-    # Validate format: YYYY, YYYY-MM, or YYYY-MM-DD
-    if not re.match(r"^\d{4}(-\d{2}(-\d{2})?)?$", date_str):
+    # Validate date input
+    is_valid, error_msg = validate_date_input(date_str)
+    if not is_valid:
         log.debug("delete_date_invalid_format input='{}' user_id={}", date_str, update.effective_user.id)
-        await update.message.reply_text(await get_text("del_invalid_date", lang))
+        await update.message.reply_text(error_msg)
         return DELETE_DATE
 
     entries = await db.get_entries_by_date_pattern(date_str)
@@ -753,27 +756,25 @@ async def settings_value_receive(update: Update, context: ContextTypes.DEFAULT_T
         if len(parts) != 2:
             await update.message.reply_text(await get_text("settings_invalid_two_numbers", lang))
             return SETTINGS_VALUE
-        try:
-            start_h, end_h = int(parts[0]), int(parts[1])
-            if not (0 <= start_h <= 23 and 0 <= end_h <= 23):
-                raise ValueError
-        except ValueError:
-            await update.message.reply_text(await get_text("settings_invalid_hours", lang))
+        
+        is_valid, error_msg = validate_reminder_window(parts[0], parts[1])
+        if not is_valid:
+            await update.message.reply_text(error_msg)
             return SETTINGS_VALUE
+        
+        start_h, end_h = int(parts[0]), int(parts[1])
         await db.set_setting("reminder_start", str(start_h))
         await db.set_setting("reminder_end", str(end_h))
         log.info("settings_updated user_id={} setting=reminder value='{}-{}'", update.effective_user.id, start_h, end_h)
         await update.message.reply_text(await get_text("settings_remind_set", lang, start=start_h, end=end_h))
 
     elif setting_type == "memory":
-        try:
-            h, m = value.split(":")
-            h, m = int(h), int(m)
-            if not (0 <= h <= 23 and 0 <= m <= 59):
-                raise ValueError
-        except ValueError:
-            await update.message.reply_text(await get_text("settings_invalid_time", lang))
+        is_valid, error_msg = validate_memory_time(value)
+        if not is_valid:
+            await update.message.reply_text(error_msg)
             return SETTINGS_VALUE
+        
+        h, m = map(int, value.split(":"))
         await db.set_setting("memory_time", f"{h:02d}:{m:02d}")
         log.info("settings_updated user_id={} setting=memory value='{}'", update.effective_user.id, f"{h:02d}:{m:02d}")
         await update.message.reply_text(await get_text("settings_memory_set", lang, time=f"{h:02d}:{m:02d}"))
