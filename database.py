@@ -46,6 +46,8 @@ async def _init_schema(db: aiosqlite.Connection):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
+        CREATE INDEX IF NOT EXISTS idx_entries_created_at ON entries(created_at);
+
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -177,19 +179,14 @@ async def get_entries_on_this_day(month: int, day: int) -> list[dict]:
     """
     tz = ZoneInfo(TIMEZONE)
     now = datetime.now(tz)
+    current_year = now.year
     db = await get_db()
     cursor = await db.execute(
-        "SELECT * FROM entries WHERE strftime('%m', created_at) = ? AND strftime('%d', created_at) = ?",
-        (f"{month:02d}", f"{day:02d}"),
+        "SELECT * FROM entries WHERE strftime('%m', created_at) = ? AND strftime('%d', created_at) = ? AND strftime('%Y', created_at) < ?",
+        (f"{month:02d}", f"{day:02d}", str(current_year)),
     )
     rows = await cursor.fetchall()
-    results = []
-    for r in rows:
-        d = dict(r)
-        entry_date = datetime.fromisoformat(d["created_at"]).replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
-        if entry_date.year < now.year:
-            results.append(d)
-    return results
+    return [dict(r) for r in rows]
 
 
 async def get_random_entry() -> dict | None:
@@ -234,14 +231,15 @@ async def get_stats() -> dict:
                 current_streak += 1
             else:
                 break
-        # longest_streak: same logic but starting from the very first entry.
-        # This gives the all-time record, not necessarily ending today.
+        # longest_streak: scan forward to find the maximum consecutive run.
         streak = 1
-        for i in range(len(date_objs) - 1, 0, -1):
+        run = 1
+        for i in range(1, len(date_objs)):
             if (date_objs[i] - date_objs[i - 1]).days == 1:
-                streak += 1
+                run += 1
+                streak = max(streak, run)
             else:
-                break
+                run = 1
 
     return {
         "total": total,
@@ -257,6 +255,22 @@ async def get_setting(key: str) -> str | None:
     cursor = await db.execute("SELECT value FROM settings WHERE key = ?", (key,))
     row = await cursor.fetchone()
     return row["value"] if row else None
+
+
+async def get_settings(keys: list[str]) -> dict[str, str | None]:
+    """Fetch multiple settings in a single query.
+
+    Returns a dict mapping each key to its value (or None if not found).
+    More efficient than calling get_setting() in a loop for each key.
+    """
+    db = await get_db()
+    placeholders = ",".join("?" for _ in keys)
+    cursor = await db.execute(
+        f"SELECT key, value FROM settings WHERE key IN ({placeholders})",
+        keys,
+    )
+    rows = await cursor.fetchall()
+    return {row["key"]: row["value"] for row in rows}
 
 
 async def set_setting(key: str, value: str):

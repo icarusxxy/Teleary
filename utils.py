@@ -5,9 +5,12 @@ from config import TIMEZONE
 import emoji_config
 from i18n import get_text
 
+_UTC = ZoneInfo("UTC")
+_LOCAL_TZ = ZoneInfo(TIMEZONE)
+
 
 def get_now() -> datetime:
-    return datetime.now(ZoneInfo(TIMEZONE))
+    return datetime.now(_LOCAL_TZ)
 
 
 def parse_date(raw: str) -> date:
@@ -108,7 +111,7 @@ def db_to_local(utc_str: str) -> datetime:
     We assume they're UTC (the convention used when inserting via import),
     then convert to the user's configured timezone for display.
     """
-    return datetime.fromisoformat(utc_str).replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(TIMEZONE))
+    return datetime.fromisoformat(utc_str).replace(tzinfo=_UTC).astimezone(_LOCAL_TZ)
 
 
 def db_to_local_date(utc_str: str) -> str:
@@ -119,18 +122,19 @@ def db_to_local_date(utc_str: str) -> str:
 async def format_entry(date: datetime, mood: str, thought: str, lang: str = "eng") -> str:
     mood_labels = await emoji_config.get_mood_labels(lang)
     label = mood_labels.get(mood, "")
-    return get_text("format_entry", lang, mood=mood, label=label, datetime=date.strftime('%A, %Y-%m-%d %H:%M'), thought=thought)
+    return await get_text("format_entry", lang, mood=mood, label=label, datetime=date.strftime('%A, %Y-%m-%d %H:%M'), thought=thought)
 
 
-async def format_memory(date: datetime, mood: str, thought: str, lang: str = "eng") -> str:
+async def format_memory(date: datetime, mood: str, thought: str, lang: str = "eng", mood_labels: dict[str, str] | None = None) -> str:
     """Format an entry for the 'on this day' memory feature.
 
     Includes a header like "1 year ago today" to give context, followed by
     the mood emoji + label and the original thought text.
     """
-    mood_labels = await emoji_config.get_mood_labels(lang)
+    if mood_labels is None:
+        mood_labels = await emoji_config.get_mood_labels(lang)
     label = mood_labels.get(mood, "")
     years_ago = get_now().year - date.year
-    suffix = get_text("format_memory_year", lang) if years_ago == 1 else get_text("format_memory_years", lang)
-    header = get_text("format_memory_header", lang, years=years_ago, suffix=suffix, date=date.strftime('%A, %Y-%m-%d'))
+    suffix = await get_text("format_memory_year", lang) if years_ago == 1 else await get_text("format_memory_years", lang)
+    header = await get_text("format_memory_header", lang, years=years_ago, suffix=suffix, date=date.strftime('%A, %Y-%m-%d'))
     return f"{header}\n{mood} {label}\n\n{thought}"

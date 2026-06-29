@@ -23,11 +23,11 @@ logger.add(
 logger = logger.bind(module="config")
 
 
-def get_reminder_pool(lang: str = "eng") -> list[str]:
+async def get_reminder_pool(lang: str = "eng") -> list[str]:
     # Lazy import to avoid circular dependency: config → i18n → config is possible
     # if i18n ever needs config values at module level.
     from i18n import get_text
-    reminders = get_text("reminder_pool", lang)
+    reminders = await get_text("reminder_pool", lang)
     if isinstance(reminders, list):
         return reminders
     # Hardcoded fallback if locale file is missing or malformed.

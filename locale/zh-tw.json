@@ -30,7 +30,7 @@
     "edit_not_found": "找不到相關的日記😭",
     "edit_current": "目前狀態：{mood} {thought}\n\n請選擇心情：",
     "edit_new_text_prompt": "目前日記內容：{thought}\n\n請輸入新的內容（或發送 /skip 保持原始內容，/cancel 取消更新）：",
-    "edit_updated": "✓ 条目已更新！",
+    "edit_updated": "✓ 日記已更新！",
 
     "del_search_keyword": "🔍 以關鍵字搜尋",
     "del_search_date": "📅 以日期搜尋",

@@ -67,7 +67,8 @@ async def _random_reminder():
         log.debug("reminder_skipped already_jotted today_entry_count={}", len(today_entries))
         return
 
-    last_sent_str = await db.get_setting("last_reminder_sent")
+    settings = await db.get_settings(["last_reminder_sent", "reminder_start", "reminder_end", "language"])
+    last_sent_str = settings.get("last_reminder_sent")
     if last_sent_str:
         last_sent = datetime.fromisoformat(last_sent_str)
         # 2-hour cooldown: prevents reminding too frequently if the user
@@ -76,15 +77,15 @@ async def _random_reminder():
             log.debug("reminder_skipped cooldown active last_sent='{}'", last_sent_str)
             return
 
-    start = int(await db.get_setting("reminder_start") or "9")
-    end = int(await db.get_setting("reminder_end") or "21")
+    start = int(settings.get("reminder_start") or "9")
+    end = int(settings.get("reminder_end") or "21")
 
     if start <= now.hour <= end:
         # 30% chance per tick (every 15 min) = ~5% chance per hour.
         # High enough to be noticed, low enough to not feel naggy.
         if random.random() < 0.30:
-            lang = await db.get_setting("language") or "eng"
-            reminder_pool = get_reminder_pool(lang)
+            lang = settings.get("language") or "eng"
+            reminder_pool = await get_reminder_pool(lang)
             msg = random.choice(reminder_pool)
             await _bot.send_message(chat_id=_chat_id, text=msg)
             await db.set_setting("last_reminder_sent", now.isoformat())

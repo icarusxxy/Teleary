@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from pathlib import Path
@@ -13,7 +14,8 @@ _translations: dict[str, dict[str, str]] = {}
 _available_langs: list[str] = []
 
 
-def _load_translations():
+def _load_translations_sync():
+    """Synchronous file I/O for loading translations."""
     global _translations, _available_langs
     if _translations:
         return
@@ -33,7 +35,14 @@ def _load_translations():
         log.warning("default_locale_missing lang={}", DEFAULT_LANG)
 
 
-def get_text(key: str, lang: str = DEFAULT_LANG, **kwargs) -> str:
+async def _load_translations():
+    """Load translations asynchronously to avoid blocking the event loop on first call."""
+    if _translations:
+        return
+    await asyncio.to_thread(_load_translations_sync)
+
+
+async def get_text(key: str, lang: str = DEFAULT_LANG, **kwargs) -> str:
     """Look up a translated string by key, with fallback to default language.
 
     Supports Python str.format() placeholders: get_text("greeting", lang, name="Alice").
@@ -41,7 +50,7 @@ def get_text(key: str, lang: str = DEFAULT_LANG, **kwargs) -> str:
     If still missing, returns the key itself as a last resort (fails visibly
     rather than silently showing empty strings).
     """
-    _load_translations()
+    await _load_translations()
 
     translations = _translations.get(lang, {})
     text = translations.get(key)
@@ -62,14 +71,14 @@ def get_text(key: str, lang: str = DEFAULT_LANG, **kwargs) -> str:
     return text
 
 
-def get_lang_for_user(user_lang_code: str | None) -> str:
+async def get_lang_for_user(user_lang_code: str | None) -> str:
     """Map a Telegram user's language_code to an available locale.
 
     Telegram sends codes like "zh-TW" or "en-US". We try exact match first,
     then the base language ("zh" from "zh-TW"), then fall back to English.
     This handles cases where a user's language is a dialect we don't support.
     """
-    _load_translations()
+    await _load_translations()
 
     if user_lang_code and user_lang_code in _translations:
         return user_lang_code
@@ -81,8 +90,8 @@ def get_lang_for_user(user_lang_code: str | None) -> str:
     return DEFAULT_LANG
 
 
-def get_available_langs() -> list[str]:
-    _load_translations()
+async def get_available_langs() -> list[str]:
+    await _load_translations()
     return list(_available_langs)
 
 
