@@ -2,12 +2,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ContextTypes,
     ConversationHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    CommandHandler,
-    filters,
 )
-from datetime import date, datetime
+from datetime import datetime
 from zoneinfo import ZoneInfo
 import asyncio
 import re
@@ -55,10 +51,6 @@ CANCEL = "cancel"
 
 _media_group_buffers: dict[str, list] = {}
 _media_group_locks: dict[str, bool] = {}
-
-
-async def _cancel_keyboard(lang: str = "eng") -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton(await get_text("cancel", lang), callback_data=CANCEL)]])
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -181,7 +173,8 @@ async def _handle_media_group(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if group_id not in _media_group_locks:
         _media_group_locks[group_id] = True
-        asyncio.create_task(_process_group())
+        task = asyncio.create_task(_process_group())
+        task.add_done_callback(lambda t: log.error("media_group_task_failed group_id={} error={}", group_id, t.exception()) if t.exception() else None)
 
 
 async def mood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -638,7 +631,8 @@ async def import_media_receive(update: Update, context: ContextTypes.DEFAULT_TYP
 
         if group_id not in _media_group_locks:
             _media_group_locks[group_id] = True
-            asyncio.create_task(_process_import_group())
+            task = asyncio.create_task(_process_import_group())
+            task.add_done_callback(lambda t: log.error("import_media_group_task_failed group_id={} error={}", group_id, t.exception()) if t.exception() else None)
     else:
         context.user_data["import_text"] = msg.caption or ""
         context.user_data["import_message_id"] = msg.message_id
@@ -676,18 +670,13 @@ async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if media_ids:
         log.debug("import_media_group_ids={} count={}", media_ids, len(media_ids))
 
-    db_conn = await db.get_db()
-    cursor = await db_conn.execute(
-        "INSERT INTO entries (message_id, mood, thought, created_at) VALUES (?, ?, ?, ?)",
-        (message_id, mood, text, dt_utc.strftime("%Y-%m-%d %H:%M:%S")),
-    )
-    await db_conn.commit()
+    entry_id = await db.save_entry(message_id, mood, text, dt_utc.strftime("%Y-%m-%d %H:%M:%S"))
 
-    log.debug("import_stored entry_id={} created_at={}", cursor.lastrowid, dt_utc.strftime("%Y-%m-%d %H:%M:%S"))
+    log.debug("import_stored entry_id={} created_at={}", entry_id, dt_utc.strftime("%Y-%m-%d %H:%M:%S"))
 
     mood_labels = await emoji_config.get_mood_labels(lang)
     label = mood_labels.get(mood, "")
-    log.info("entry_imported entry_id={} mood={} target_dt={} user_id={}", cursor.lastrowid, mood, target_dt, update.effective_user.id)
+    log.info("entry_imported entry_id={} mood={} target_dt={} user_id={}", entry_id, mood, target_dt, update.effective_user.id)
     media_count = f" ({len(media_ids)} items)" if media_ids else ""
     await query.edit_message_text(await get_text("import_imported", lang, mood=mood, label=label, media=media_count, datetime=target_dt.strftime('%Y-%m-%d %H:%M:%S')))
     return ConversationHandler.END
@@ -893,7 +882,7 @@ async def emoji_settings_main_callback(update: Update, context: ContextTypes.DEF
         return EMOJI_ADD
 
     if action == "reset":
-        default_moods = emoji_config.get_default_moods_full(lang)
+        default_moods = await emoji_config.get_default_moods_full(lang)
         default_list = "\n".join(f"  {m['emoji']} {m['label']}" for m in default_moods)
         keyboard = [
             [
@@ -1310,7 +1299,7 @@ async def cmd_search_by_date(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # ── Memory (called by scheduler) ────────────────────────
 
-async def send_memories(context):
+async def send_memories(bot, chat_id: int):
     """Send 'on this day' entries from previous years as replies to original messages.
 
     Called by the scheduler at the configured memory_time. Each entry is sent
@@ -1319,7 +1308,6 @@ async def send_memories(context):
     """
     now = get_now()
     entries = await db.get_entries_on_this_day(now.month, now.day)
-    chat_id = context.chat_id
 
     log.info("memory_check month={} day={} found_entries={}", now.month, now.day, len(entries))
 
@@ -1339,15 +1327,15 @@ async def send_memories(context):
         )
         if entry["message_id"]:
             try:
-                await context.bot.send_message(
+                await bot.send_message(
                     chat_id=chat_id,
                     text=text,
                     reply_to_message_id=entry["message_id"],
                 )
             except Exception as e:
                 log.warning("memory_reply_failed entry_id={} error={}", entry["id"], str(e))
-                await context.bot.send_message(chat_id=chat_id, text=text)
+                await bot.send_message(chat_id=chat_id, text=text)
         else:
-            await context.bot.send_message(chat_id=chat_id, text=text)
+            await bot.send_message(chat_id=chat_id, text=text)
 
     log.info("memories_sent count={}", len(entries))

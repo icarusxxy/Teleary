@@ -56,12 +56,18 @@ async def _init_schema(db: aiosqlite.Connection):
     await db.commit()
 
 
-async def save_entry(message_id: int, mood: str, thought: str) -> int:
+async def save_entry(message_id: int, mood: str, thought: str, created_at: str | None = None) -> int:
     db = await get_db()
-    cursor = await db.execute(
-        "INSERT INTO entries (message_id, mood, thought) VALUES (?, ?, ?)",
-        (message_id, mood, thought),
-    )
+    if created_at:
+        cursor = await db.execute(
+            "INSERT INTO entries (message_id, mood, thought, created_at) VALUES (?, ?, ?, ?)",
+            (message_id, mood, thought, created_at),
+        )
+    else:
+        cursor = await db.execute(
+            "INSERT INTO entries (message_id, mood, thought) VALUES (?, ?, ?)",
+            (message_id, mood, thought),
+        )
     await db.commit()
     entry_id = cursor.lastrowid
     log.debug("db_save_entry entry_id={} mood={} text_len={}", entry_id, mood, len(thought))
@@ -127,7 +133,8 @@ async def search_entries(query: str, limit: int = 20) -> list[dict]:
 
 async def update_entry(entry_id: int, mood: str | None = None, thought: str | None = None):
     db = await get_db()
-    sets, vals = [], []
+    sets: list[str] = []
+    vals: list[str | int] = []
     if mood is not None:
         sets.append("mood = ?")
         vals.append(mood)
@@ -221,7 +228,6 @@ async def get_stats() -> dict:
     streak = 0
     current_streak = 0
     if dates:
-        from datetime import timedelta
         today = now.date()
         date_objs = [date.fromisoformat(d) for d in dates]
 

@@ -110,11 +110,4 @@ async def _daily_memory():
     log.info("memory_fired hour={}", now.hour)
     from handlers import send_memories
 
-    # send_memories expects a context-like object with .bot and .chat_id.
-    # APScheduler doesn't provide a telegram Context, so we build a minimal shim.
-    class FakeContext:
-        def __init__(self, bot, chat_id):
-            self.bot = bot
-            self.chat_id = chat_id
-
-    await send_memories(FakeContext(_bot, _chat_id))
+    await send_memories(_bot, _chat_id)
