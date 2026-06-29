@@ -73,6 +73,15 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(get_text("welcome", lang))
 
 
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = await _lang(update)
+    await update.message.reply_text(get_text("welcome", lang))
+
+
+async def cmd_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await _show_language_menu(update, context)
+
+
 # ── New Entry ───────────────────────────────────────────
 
 async def receive_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):

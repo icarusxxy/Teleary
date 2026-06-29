@@ -15,6 +15,8 @@ log = logger.bind(module="bot")
 
 from handlers import (
     cmd_start,
+    cmd_help,
+    cmd_language,
     receive_entry,
     mood_callback,
     cmd_edit,
@@ -179,7 +181,10 @@ def main():
     )
 
     settings_conv = ConversationHandler(
-        entry_points=[CommandHandler("settings", cmd_settings)],
+        entry_points=[
+            CommandHandler("settings", cmd_settings),
+            CommandHandler("language", cmd_language),
+        ],
         states={
             SETTINGS_SELECT: [
                 CallbackQueryHandler(settings_select_callback, pattern=r"^set:"),
@@ -209,6 +214,7 @@ def main():
     )
 
     app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("list", cmd_list))
     app.add_handler(CommandHandler("search", cmd_search))

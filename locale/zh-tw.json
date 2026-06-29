@@ -8,7 +8,7 @@
     "skip": "/skip",
     "cancel_cmd": "/cancel",
 
-    "welcome": "📖 歡迎使用 Teleary！ 你的專屬心情日記❤️\n\n只要把想記錄的心情—文字、照片、影片、或多張影音傳給我就可以了！就像寫日記一樣，可以長篇紀錄，也可以隨意摘錄，看你心情😊\n\n支援的指令：\n/list — 瀏覽你的日記\n/random — 隨機閱讀一篇舊日記！\n/search <關鍵字> — 搜尋日記\n/search_by_date <日期> — 依日期搜尋 (YYYY, YYYY-MM, YYYY-MM-DD)\n/edit — 編輯舊日記\n/delete — 刪除舊日記\n/import YYYY-MM-DD — 匯入過往日記\n/settings — 設定（提醒、回憶、心情與語言）\n/stats — 查看日記統計\n/cancel — 取消當前操作",
+    "welcome": "📖 歡迎使用 Teleary！ 你的專屬心情日記❤️\n\n只要把想記錄的心情—文字、照片、影片、或多張影音傳給我就可以了！就像寫日記一樣，可以長篇紀錄，也可以隨意摘錄，看你心情😊\n\n可以從 /language 設定顯示語言。\n\n支援的指令：\n/list — 瀏覽你的日記\n/random — 隨機閱讀一篇舊日記！\n/search <關鍵字> — 搜尋日記\n/search_by_date <日期> — 依日期搜尋 (YYYY, YYYY-MM, YYYY-MM-DD)\n/edit — 編輯舊日記\n/delete — 刪除舊日記\n/import YYYY-MM-DD — 匯入過往日記\n/settings — 設定（提醒、回憶、心情與語言）\n/stats — 查看日記統計\n/help — 顯示幫助頁面\n/cancel — 取消當前操作",
 
     "how_are_you_feeling": "現在心情怎如何呢～？",
     "album_items_how_feeling": "📸 收到包含 {count} 個影音的相簿。現在心情如何呢？",
@@ -101,11 +101,11 @@
     "list_newer_shown": "📖 較新的日記 — 顯示 {count} 個",
 
     "search_not_found": "還沒有日記。開始記錄你的第一篇吧！📝。",
-    "search_usage": "使用方法：/search <關鍵字>",
+    "search_usage": "使用方法：/search <關鍵字>\n\n範例：\n- /search 出遊\n- /search 工作",
     "search_no_matching": "找不到跟 \"{query}\" 相關的日記🤨",
     "search_results": "🔍 找到 {count} 個跟 \"{query}\" 相關的結果",
 
-    "search_by_date_usage": "使用方法：/search_by_date <日期>\n\n格式：YYYY, YYYY-MM, YYYY-MM-DD\n範例：2026, 2026/06, 2026-06-25",
+    "search_by_date_usage": "使用方法：/search_by_date <日期>\n\n格式：YYYY, YYYY-MM, YYYY-MM-DD\n範例：\n- /search_by_date 2026\n- /search_by_date 2026/11\n- /search_by_date 2026-11-25",
     "search_by_date_invalid": "日期格式錯誤 \"{raw}\"。請使用 YYYY, YYYY-MM, 或 YYYY-MM-DD。",
     "search_by_date_no_matching": "找不到在 \"{pattern}\" 紀錄的日記。",
     "search_by_date_results": "📅 找到 {count} 個在 {pattern} 紀錄的日記",
