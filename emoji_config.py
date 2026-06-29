@@ -6,6 +6,8 @@ from i18n import get_text
 
 log = logger.bind(module="emoji_config")
 
+# Default moods shipped with the bot. Users can customize these via /settings,
+# but these serve as the initial set and the "reset to defaults" target.
 DEFAULT_MOODS = [
     {"emoji": "😁", "label": "Happy"},
     {"emoji": "☺️", "label": "Good"},
@@ -15,6 +17,9 @@ DEFAULT_MOODS = [
     {"emoji": "😡", "label": "Angry"},
 ]
 
+# Maps default emojis to i18n keys for translated labels.
+# Custom emojis added by the user won't be in this map — they keep their
+# user-provided label as-is (see get_mood_labels for the merge logic).
 MOOD_KEYS = {
     "😁": "mood_happy",
     "☺️": "mood_good",
@@ -37,6 +42,12 @@ async def get_moods() -> list[str]:
 
 
 async def get_mood_labels(lang: str = "eng") -> dict[str, str]:
+    """Return emoji → translated label mapping.
+
+    For default emojis, uses i18n translation keys via MOOD_KEYS.
+    For custom user-added emojis, uses the label stored at creation time.
+    This lets default moods translate automatically while custom ones stay as-is.
+    """
     raw = await db.get_setting("moods")
     if raw:
         try:

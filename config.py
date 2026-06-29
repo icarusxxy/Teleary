@@ -5,11 +5,14 @@ from loguru import logger
 
 load_dotenv()
 
+# BOT_TOKEN is required — crash immediately if missing rather than failing at runtime.
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 TIMEZONE = os.getenv("TIMEZONE", "Asia/Taipei")
 DB_PATH = os.getenv("DB_PATH", "diary.db")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
+# Loguru setup: remove default handler, add stderr with module context.
+# Each module binds its own module name via logger.bind(module="...") for traceability.
 logger.remove()
 logger.add(
     sys.stderr,
@@ -21,10 +24,13 @@ logger = logger.bind(module="config")
 
 
 def get_reminder_pool(lang: str = "eng") -> list[str]:
+    # Lazy import to avoid circular dependency: config → i18n → config is possible
+    # if i18n ever needs config values at module level.
     from i18n import get_text
     reminders = get_text("reminder_pool", lang)
     if isinstance(reminders, list):
         return reminders
+    # Hardcoded fallback if locale file is missing or malformed.
     return [
         "Hey, don't forget to write something down today!",
         "How are you feeling? Take a moment to journal.",

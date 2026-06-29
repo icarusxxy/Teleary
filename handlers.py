@@ -23,6 +23,11 @@ log = logger.bind(module="handlers")
 
 
 async def _lang(update: Update) -> str:
+    """Resolve user language: DB setting > Telegram client language > default.
+
+    Checks the database first because the user may have explicitly chosen a
+    language in /settings that differs from their Telegram client language.
+    """
     user = update.effective_user
     if update.callback_query:
         user = update.callback_query.from_user
@@ -35,6 +40,9 @@ async def _lang(update: Update) -> str:
     return get_lang_for_user(lang_code)
 
 
+# ConversationHandler state constants. These are arbitrary integers — each
+# state represents a step in a conversation flow. python-telegram-bot uses
+# these to route incoming messages to the correct handler within a conversation.
 MOOD_PICK, ENTRY_TEXT, EDIT_SELECT, EDIT_MOOD, EDIT_TEXT = range(5)
 IMPORT_DATE, IMPORT_MOOD = range(5, 7)
 SETTINGS_SELECT, SETTINGS_VALUE = range(7, 9)
@@ -111,6 +119,13 @@ async def receive_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def _handle_media_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Buffer media group (album) messages and process them as a single entry.
+
+    Telegram sends album items as separate messages, each with the same
+    media_group_id. We can't know how many items are in the album until they
+    all arrive, so we buffer for 1.5s and process the group as one entry.
+    The lock prevents duplicate processing if multiple items arrive rapidly.
+    """
     msg = update.message
     group_id = msg.media_group_id
 
@@ -120,6 +135,9 @@ async def _handle_media_group(update: Update, context: ContextTypes.DEFAULT_TYPE
     _media_group_buffers[group_id].append(msg)
 
     async def _process_group():
+        # Wait 1.5s to collect all album items — Telegram sends them in rapid
+        # succession but not atomically. This is a pragmatic trade-off between
+        # latency and correctness.
         await asyncio.sleep(1.5)
         messages = _media_group_buffers.pop(group_id, [])
         _media_group_locks.pop(group_id, None)
@@ -643,6 +661,8 @@ async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     target_dt = context.user_data["import_date"]
     text = context.user_data.get("import_text", "")
 
+    # Convert local time to UTC for storage. SQLite stores timestamps without
+    # timezone info, so we normalize to UTC before inserting.
     dt_utc = target_dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
 
     log.debug("import_saving user_id={} target_dt={} dt_utc={}", update.effective_user.id, target_dt, dt_utc)
@@ -1186,6 +1206,9 @@ async def view_entry_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         lang=lang,
     )
 
+    # Reply to the original message when possible — this preserves the context
+    # of what the user was writing about when they made the entry. Falls back
+    # to a plain message if the original message was deleted or is too old.
     if entry["message_id"]:
         try:
             await query.message.reply_text(text, reply_to_message_id=entry["message_id"])
@@ -1326,6 +1349,12 @@ async def cmd_search_by_date(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ── Memory (called by scheduler) ────────────────────────
 
 async def send_memories(context):
+    """Send 'on this day' entries from previous years as replies to original messages.
+
+    Called by the scheduler at the configured memory_time. Each entry is sent
+    as a reply to its original message_id so the user sees the memory in context.
+    If the original message was deleted, falls back to a standalone message.
+    """
     now = get_now()
     entries = await db.get_entries_on_this_day(now.month, now.day)
     chat_id = context.chat_id

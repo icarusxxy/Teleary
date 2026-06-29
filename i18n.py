@@ -34,6 +34,13 @@ def _load_translations():
 
 
 def get_text(key: str, lang: str = DEFAULT_LANG, **kwargs) -> str:
+    """Look up a translated string by key, with fallback to default language.
+
+    Supports Python str.format() placeholders: get_text("greeting", lang, name="Alice").
+    If the key is missing in the requested language, falls back to English.
+    If still missing, returns the key itself as a last resort (fails visibly
+    rather than silently showing empty strings).
+    """
     _load_translations()
 
     translations = _translations.get(lang, {})
@@ -45,6 +52,7 @@ def get_text(key: str, lang: str = DEFAULT_LANG, **kwargs) -> str:
         if lang != DEFAULT_LANG:
             log.debug("translation_fallback key={} lang={}", key, lang)
 
+    # Format with kwargs if provided — allows dynamic values like counts, names, etc.
     if kwargs:
         try:
             text = text.format(**kwargs)
@@ -55,6 +63,12 @@ def get_text(key: str, lang: str = DEFAULT_LANG, **kwargs) -> str:
 
 
 def get_lang_for_user(user_lang_code: str | None) -> str:
+    """Map a Telegram user's language_code to an available locale.
+
+    Telegram sends codes like "zh-TW" or "en-US". We try exact match first,
+    then the base language ("zh" from "zh-TW"), then fall back to English.
+    This handles cases where a user's language is a dialect we don't support.
+    """
     _load_translations()
 
     if user_lang_code and user_lang_code in _translations:

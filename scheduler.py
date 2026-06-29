@@ -18,6 +18,15 @@ _chat_id = None
 
 
 def init_scheduler(bot, chat_id: int | None):
+    """Start the scheduler with two jobs:
+
+    1. Random reminder: fires every 15 min, 30% chance of sending a reminder
+       message. Has a 2-hour cooldown between sends to avoid being annoying.
+
+    2. Daily memory: fires every hour on the hour, but only actually sends
+       at the user's configured memory_time. This avoids needing a precise
+       cron expression for an arbitrary HH:MM.
+    """
     global _bot, _chat_id
     _bot = bot
     _chat_id = chat_id
@@ -51,6 +60,8 @@ async def _random_reminder():
 
     now = get_now()
 
+    # Don't remind if the user already journaled today — the goal is to
+    # encourage the habit, not nag when they've already done it.
     today_entries = await db.get_entries_by_date(now.date())
     if today_entries:
         log.debug("reminder_skipped already_jotted today_entry_count={}", len(today_entries))
@@ -59,6 +70,8 @@ async def _random_reminder():
     last_sent_str = await db.get_setting("last_reminder_sent")
     if last_sent_str:
         last_sent = datetime.fromisoformat(last_sent_str)
+        # 2-hour cooldown: prevents reminding too frequently if the user
+        # is actively chatting but just not journaling.
         if (now - last_sent).total_seconds() < 7200:
             log.debug("reminder_skipped cooldown active last_sent='{}'", last_sent_str)
             return
@@ -67,6 +80,8 @@ async def _random_reminder():
     end = int(await db.get_setting("reminder_end") or "21")
 
     if start <= now.hour <= end:
+        # 30% chance per tick (every 15 min) = ~5% chance per hour.
+        # High enough to be noticed, low enough to not feel naggy.
         if random.random() < 0.30:
             lang = await db.get_setting("language") or "eng"
             reminder_pool = get_reminder_pool(lang)
@@ -94,6 +109,8 @@ async def _daily_memory():
     log.info("memory_fired hour={}", now.hour)
     from handlers import send_memories
 
+    # send_memories expects a context-like object with .bot and .chat_id.
+    # APScheduler doesn't provide a telegram Context, so we build a minimal shim.
     class FakeContext:
         def __init__(self, bot, chat_id):
             self.bot = bot

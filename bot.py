@@ -13,6 +13,9 @@ import database as db
 
 log = logger.bind(module="bot")
 
+# Handler imports are grouped by feature. Each handler function is imported
+# individually because ConversationHandler states reference specific callbacks —
+# importing a module wouldn't work here without qualifying every reference.
 from handlers import (
     cmd_start,
     cmd_help,
@@ -77,9 +80,12 @@ from handlers import (
 from scheduler import init_scheduler
 
 
+# Lifecycle hooks: post_init opens the DB and starts the scheduler after the
+# Application is fully built; post_shutdown tears them down on SIGINT/SIGTERM.
 async def post_init(application: Application):
     log.info("Initializing bot: opening database and starting scheduler")
     await db.get_db()
+    # chat_id is None initially — set to the user's chat_id on first /start or message.
     init_scheduler(application.bot, None)
     log.info("Bot initialized")
 
@@ -93,8 +99,16 @@ async def post_shutdown(application: Application):
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
+    # Shared cancel button handler — reused across all conversation flows.
+    # Pattern anchored with ^ and $ to avoid matching substrings like "cancel_something".
     cancel_cb = CallbackQueryHandler(cancel, pattern=r"^cancel$")
 
+    # ConversationHandler lifecycle:
+    # 1. User sends text/photo/media → receive_entry → MOOD_PICK
+    # 2. User taps mood emoji → mood_callback → END (entry saved)
+    #
+    # Media groups (albums) arrive as multiple messages with the same media_group_id.
+    # We buffer them with a 1.5s delay to collect all items before prompting for mood.
     entry_conv = ConversationHandler(
         entry_points=[
             MessageHandler(
@@ -213,6 +227,9 @@ def main():
         fallbacks=[CommandHandler("cancel", cancel)],
     )
 
+    # Registration order matters: python-telegram-bot checks handlers top-to-bottom.
+    # Commands must come first so /edit, /delete, /import aren't swallowed by entry_conv
+    # (which catches all text messages). ConversationHandlers go last as catch-alls.
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("stats", cmd_stats))
@@ -227,7 +244,7 @@ def main():
     app.add_handler(edit_conv)
     app.add_handler(delete_conv)
     app.add_handler(settings_conv)
-    app.add_handler(entry_conv)
+    app.add_handler(entry_conv)  # Must be last — catches all unmatched text/media
 
     app.post_init = post_init
     app.post_shutdown = post_shutdown

@@ -102,7 +102,12 @@ def parse_time(raw: str) -> tuple[int, int, int]:
 
 
 def db_to_local(utc_str: str) -> datetime:
-    """Convert a UTC timestamp string from the database to the configured timezone."""
+    """Convert a UTC timestamp string from the database to the configured timezone.
+
+    IMPORTANT: SQLite stores timestamps as plain strings without timezone info.
+    We assume they're UTC (the convention used when inserting via import),
+    then convert to the user's configured timezone for display.
+    """
     return datetime.fromisoformat(utc_str).replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(TIMEZONE))
 
 
@@ -118,6 +123,11 @@ async def format_entry(date: datetime, mood: str, thought: str, lang: str = "eng
 
 
 async def format_memory(date: datetime, mood: str, thought: str, lang: str = "eng") -> str:
+    """Format an entry for the 'on this day' memory feature.
+
+    Includes a header like "1 year ago today" to give context, followed by
+    the mood emoji + label and the original thought text.
+    """
     mood_labels = await emoji_config.get_mood_labels(lang)
     label = mood_labels.get(mood, "")
     years_ago = get_now().year - date.year

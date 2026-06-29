@@ -7,6 +7,8 @@ from config import DB_PATH, TIMEZONE
 
 log = logger.bind(module="database")
 
+# Module-level singleton connection. Using a global avoids passing the connection
+# through every function call, but means only one connection exists at a time.
 _db: aiosqlite.Connection | None = None
 
 
@@ -16,6 +18,8 @@ async def get_db() -> aiosqlite.Connection:
         log.debug("db_connecting path={}", DB_PATH)
         _db = await aiosqlite.connect(DB_PATH)
         _db.row_factory = aiosqlite.Row
+        # WAL mode allows concurrent reads while writing — important because
+        # the scheduler sends reminders on a timer while the user may be saving entries.
         await _db.execute("PRAGMA journal_mode=WAL")
         await _init_schema(_db)
         log.info("db_connected path={}", DB_PATH)
@@ -165,6 +169,12 @@ async def get_entries_by_date_pattern(pattern: str, limit: int = 30) -> list[dic
 
 
 async def get_entries_on_this_day(month: int, day: int) -> list[dict]:
+    """Fetch entries from previous years on the same calendar day.
+
+    Used by the daily memory feature to resurface "on this day" entries.
+    Only returns entries from years before the current year — showing today's
+    entry from this morning isn't a useful memory.
+    """
     tz = ZoneInfo(TIMEZONE)
     now = datetime.now(tz)
     db = await get_db()
@@ -216,12 +226,16 @@ async def get_stats() -> dict:
     if dates:
         from datetime import timedelta
         date_objs = [date.fromisoformat(d) for d in dates]
+        # current_streak: count consecutive days ending at today (or yesterday)
+        # by walking backwards from the most recent entry.
         current_streak = 1
         for i in range(len(date_objs) - 1, 0, -1):
             if (date_objs[i] - date_objs[i - 1]).days == 1:
                 current_streak += 1
             else:
                 break
+        # longest_streak: same logic but starting from the very first entry.
+        # This gives the all-time record, not necessarily ending today.
         streak = 1
         for i in range(len(date_objs) - 1, 0, -1):
             if (date_objs[i] - date_objs[i - 1]).days == 1:
