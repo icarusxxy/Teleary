@@ -49,7 +49,7 @@
     "del_confirm": "刪除這個日記？\n\n{mood} {date}\n{thought}",
     "del_deleted": "✓ 日記已刪除！",
 
-    "import_usage": "使用方法：/import YYYY-MM-DD [HHMM]\n接受 YYYY-MM-DD, YYYY/MM/DD, 或 YYYYMMDD。\n可後面附上時間：HHMM, HH:MM, HHMMSS, 或 HH:MM:SS。\n發送後再開始記錄日記內文。",
+    "import_usage": "使用方法：/import YYYY-MM-DD [HHMM]\n\n接受 YYYY-MM-DD, YYYY/MM/DD, 或 YYYYMMDD。\n後面可附上時間：HHMM, HH:MM, HHMMSS, 或 HH:MM:SS。(非必填)\n\n發送後再開始記錄日記內文。",
     "import_invalid_date": "日期格式錯誤。請使用 YYYYMMDD, YYYY/MM/DD, 或 YYYY-MM-DD",
     "import_invalid_time": "時間格式錯誤。请使用 HHMM(SS) 或 HH:MM(:SS)。",
     "import_send_text": "發送日記內容（或 /cancel 以取消）：",
@@ -121,6 +121,16 @@
     "mood_meh": "咩",
     "mood_sad": "難過",
     "mood_angry": "生氣",
+
+    "validator_date_format": "日期格式錯誤。請使用 YYYY, YYYY-MM, 或 YYYY-MM-DD。",
+    "validator_date_future": "日期不能是未來。",
+    "validator_date_too_old": "日期太久遠（最多 10 年）。",
+    "validator_date_invalid": "日期數值無效。",
+    "validator_start_hours_range": "開始小時必須在 0 到 23 之間。",
+    "validator_end_hours_range": "結束小時必須在 0 到 23 之間。",
+    "validator_hours_not_numbers": "小時必須是有效數字。",
+    "validator_time_format": "時間格式錯誤。請輸入 HH:MM（例如 09:00）。",
+    "validator_time_values": "時間數值無效。",
 
     "reminder_pool": [
         "別忘記來寫點東西！",

@@ -49,7 +49,7 @@
     "del_confirm": "Delete this entry?\n\n{mood} {date}\n{thought}",
     "del_deleted": "✓ Entry deleted!",
 
-    "import_usage": "Usage: /import YYYY-MM-DD [HHMM]\nAccepts YYYY-MM-DD, YYYY/MM/DD, or YYYYMMDD.\nOptional time: HHMM, HH:MM, HHMMSS, or HH:MM:SS.\nThen send the text on the next line.",
+    "import_usage": "Usage: /import YYYY-MM-DD [HHMM]\n\nAccepts YYYY-MM-DD, YYYY/MM/DD, or YYYYMMDD.\nOptional time: HHMM, HH:MM, HHMMSS, or HH:MM:SS.\n\nThen send the text on the next prompt.",
     "import_invalid_date": "Invalid date format. Use YYYY-MM-DD, YYYY/MM/DD, or YYYYMMDD.",
     "import_invalid_time": "Invalid time format. Use HHMM or HHMMSS.",
     "import_send_text": "Send me the entry text (or /cancel to abort):",
@@ -121,6 +121,16 @@
     "mood_meh": "Meh",
     "mood_sad": "Sad",
     "mood_angry": "Angry",
+
+    "validator_date_format": "Invalid date format. Use YYYY, YYYY-MM, or YYYY-MM-DD.",
+    "validator_date_future": "Date cannot be in the future.",
+    "validator_date_too_old": "Date too far in the past (maximum 10 years).",
+    "validator_date_invalid": "Invalid date value.",
+    "validator_start_hours_range": "Start hour must be between 0 and 23.",
+    "validator_end_hours_range": "End hour must be between 0 and 23.",
+    "validator_hours_not_numbers": "Hours must be valid numbers.",
+    "validator_time_format": "Invalid time format. Use HH:MM (e.g., 09:00).",
+    "validator_time_values": "Invalid time values.",
 
     "reminder_pool": [
         "Hey, don't forget to write something down today!",

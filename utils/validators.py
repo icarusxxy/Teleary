@@ -3,6 +3,10 @@ from re import fullmatch
 from utils.utils import parse_date, get_now
 
 
+# Validators return i18n translation keys instead of hardcoded strings.
+# Callers resolve the keys via get_text(key, lang) before sending to the user.
+
+
 def validate_date_input(date_str: str) -> tuple[bool, str]:
     """Validate date input is reasonable.
     
@@ -12,13 +16,13 @@ def validate_date_input(date_str: str) -> tuple[bool, str]:
     - Date is not too far in the past (max 10 years)
     
     Returns:
-        Tuple of (is_valid, error_message)
+        Tuple of (is_valid, i18n_error_key)
     """
     cleaned = date_str.strip()
     
     # Validate format first
     if not fullmatch(r"^\d{4}(-\d{2}(-\d{2})?)?$", cleaned):
-        return False, "Invalid date format. Use YYYY, YYYY-MM, or YYYY-MM-DD."
+        return False, "validator_date_format"
     
     # For full dates (YYYY-MM-DD), check reasonableness
     if fullmatch(r"^\d{4}-\d{2}-\d{2}$", cleaned):
@@ -27,14 +31,14 @@ def validate_date_input(date_str: str) -> tuple[bool, str]:
             today = get_now().date()
             
             if target_date > today:
-                return False, "Date cannot be in the future."
+                return False, "validator_date_future"
             
             if (today - target_date).days > 365 * 10:
-                return False, "Date too far in the past (maximum 10 years)."
+                return False, "validator_date_too_old"
             
             return True, ""
         except (ValueError, TypeError):
-            return False, "Invalid date value."
+            return False, "validator_date_invalid"
     
     # For partial dates (YYYY or YYYY-MM), just validate format
     return True, ""
@@ -44,36 +48,36 @@ def validate_reminder_window(start_str: str, end_str: str) -> tuple[bool, str]:
     """Validate reminder window hours.
     
     Returns:
-        Tuple of (is_valid, error_message)
+        Tuple of (is_valid, i18n_error_key)
     """
     try:
         start_h = int(start_str)
         end_h = int(end_str)
         
         if not (0 <= start_h <= 23):
-            return False, "Start hour must be between 0 and 23."
+            return False, "validator_start_hours_range"
         
         if not (0 <= end_h <= 23):
-            return False, "End hour must be between 0 and 23."
+            return False, "validator_end_hours_range"
         
         return True, ""
     except ValueError:
-        return False, "Hours must be valid numbers."
+        return False, "validator_hours_not_numbers"
 
 
 def validate_memory_time(time_str: str) -> tuple[bool, str]:
     """Validate memory time in HH:MM format.
     
     Returns:
-        Tuple of (is_valid, error_message)
+        Tuple of (is_valid, i18n_error_key)
     """
     if not fullmatch(r"\d{2}:\d{2}$", time_str):
-        return False, "Invalid time format. Use HH:MM (e.g., 09:00)."
+        return False, "validator_time_format"
     
     try:
         h, m = map(int, time_str.split(":"))
         if not (0 <= h <= 23 and 0 <= m <= 59):
-            return False, "Invalid time values."
+            return False, "validator_time_values"
         return True, ""
     except ValueError:
-        return False, "Invalid time format."
+        return False, "validator_time_format"

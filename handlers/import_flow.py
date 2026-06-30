@@ -122,8 +122,6 @@ async def import_media_receive(update: Update, context: ContextTypes.DEFAULT_TYP
         await msg.reply_text(await get_text("import_pick_mood", user_lang), reply_markup=await mood_keyboard(user_lang, "imood"))
         return IMPORT_MOOD
 
-    return IMPORT_MOOD
-
 
 async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle mood selection for import - save entry with custom date."""

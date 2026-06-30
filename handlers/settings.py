@@ -101,9 +101,9 @@ async def settings_value_receive(update: Update, context: ContextTypes.DEFAULT_T
             await update.message.reply_text(await get_text("settings_invalid_two_numbers", user_lang))
             return SETTINGS_VALUE
         
-        is_valid, error_msg = validate_reminder_window(parts[0], parts[1])
+        is_valid, error_key = validate_reminder_window(parts[0], parts[1])
         if not is_valid:
-            await update.message.reply_text(error_msg)
+            await update.message.reply_text(await get_text(error_key, user_lang))
             return SETTINGS_VALUE
         
         start_h, end_h = int(parts[0]), int(parts[1])
@@ -113,9 +113,9 @@ async def settings_value_receive(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text(await get_text("settings_remind_set", user_lang, start=start_h, end=end_h))
 
     elif setting_type == "memory":
-        is_valid, error_msg = validate_memory_time(value)
+        is_valid, error_key = validate_memory_time(value)
         if not is_valid:
-            await update.message.reply_text(error_msg)
+            await update.message.reply_text(await get_text(error_key, user_lang))
             return SETTINGS_VALUE
         
         h, m = map(int, value.split(":"))

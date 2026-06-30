@@ -121,10 +121,10 @@ async def delete_date_receive(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_lang = await lang(update)
     
     # Validate date input
-    is_valid, error_msg = validate_date_input(date_str)
+    is_valid, error_key = validate_date_input(date_str)
     if not is_valid:
         log.debug("delete_date_invalid_format input='{}' user_id={}", date_str, update.effective_user.id)
-        await update.message.reply_text(error_msg)
+        await update.message.reply_text(await get_text(error_key, user_lang))
         return DELETE_DATE
 
     entries = await db.get_entries_by_date_pattern(date_str)

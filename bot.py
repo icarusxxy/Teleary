@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 from loguru import logger
 from telegram.ext import (
     Application,
@@ -8,10 +10,13 @@ from telegram.ext import (
     filters,
 )
 
-from core.config import BOT_TOKEN
+from core.config import BOT_TOKEN, DB_PATH
 import core.database as db
 
 log = logger.bind(module="bot")
+
+# PID file for Docker health checks
+PID_FILE = Path(DB_PATH).parent / ".pid"
 
 # Handler imports are grouped by feature. Each handler function is imported
 # individually because ConversationHandler states reference specific callbacks —
@@ -85,18 +90,32 @@ from core.scheduler import init_scheduler
 async def post_init(application: Application):
     log.info("Initializing bot: opening database and starting scheduler")
     await db.get_db()
+    
+    # Write PID file for Docker health checks
+    PID_FILE.parent.mkdir(parents=True, exist_ok=True)
+    PID_FILE.write_text(str(os.getpid()))
+    log.info("PID file written pid={}", os.getpid())
+    
     # chat_id is None initially — set to the user's chat_id on first /start or message.
     init_scheduler(application.bot, None)
     log.info("Bot initialized")
 
 
 async def post_shutdown(application: Application):
-    log.info("Shutting down: closing database")
+    log.info("Shutting down: closing database and scheduler")
+    
+    # Clean up PID file
+    if PID_FILE.exists():
+        PID_FILE.unlink()
+        log.debug("PID file removed")
+    
     await db.close_db()
     log.info("Shutdown complete")
 
 
 def main():
+    log.info("Starting Teleary diary bot", version="1.0.0")
+    
     app = Application.builder().token(BOT_TOKEN).build()
 
     # Shared cancel button handler — reused across all conversation flows.
@@ -253,8 +272,14 @@ def main():
     app.post_init = post_init
     app.post_shutdown = post_shutdown
 
-    log.info("Starting bot with polling")
-    app.run_polling()
+    log.info("Bot starting with polling", pid=os.getpid())
+    
+    # Run the bot with proper signal handling
+    # python-telegram-bot handles SIGINT/SIGTERM internally
+    app.run_polling(
+        drop_pending_updates=False,  # Ignore updates from downtime
+        allowed_updates=["message", "callback_query"],  # Explicit update types
+    )
 
 
 if __name__ == "__main__":

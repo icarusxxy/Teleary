@@ -1,10 +1,10 @@
 import aiosqlite
-from datetime import date, datetime
-from zoneinfo import ZoneInfo
+from datetime import date
 
 from loguru import logger
-from core.config import DB_PATH, TIMEZONE
+from core.config import DB_PATH
 from core.cache import get_cached_setting, cache_setting, invalidate_setting
+from utils.utils import get_now
 
 log = logger.bind(module="database")
 
@@ -201,8 +201,7 @@ async def get_entries_on_this_day(month: int, day: int) -> list[dict]:
     Only returns entries from years before the current year — showing today's
     entry from this morning isn't a useful memory.
     """
-    tz = ZoneInfo(TIMEZONE)
-    now = datetime.now(tz)
+    now = get_now()
     current_year = now.year
     db = await get_db()
     cursor = await db.execute(
@@ -226,7 +225,7 @@ async def get_stats() -> dict:
     cursor = await db.execute("SELECT COUNT(*) FROM entries")
     total = (await cursor.fetchone())[0]
 
-    now = datetime.now(ZoneInfo(TIMEZONE))
+    now = get_now()
     cursor = await db.execute(
         "SELECT COUNT(*) FROM entries WHERE strftime('%Y-%m', created_at) = ?",
         (now.strftime("%Y-%m"),),
