@@ -8,7 +8,7 @@ load_dotenv()
 # BOT_TOKEN is required — crash immediately if missing rather than failing at runtime.
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 TIMEZONE = os.getenv("TIMEZONE", "Asia/Taipei")
-DB_PATH = os.getenv("DB_PATH", "diary.db")
+DB_PATH = os.getenv("DB_PATH", "data/diary.db")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
 # Loguru setup: remove default handler, add stderr with module context.
