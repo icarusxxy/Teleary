@@ -3,8 +3,8 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from loguru import logger
-from config import DB_PATH, TIMEZONE
-from cache import get_cached_setting, cache_setting, invalidate_setting
+from core.config import DB_PATH, TIMEZONE
+from core.cache import get_cached_setting, cache_setting, invalidate_setting
 
 log = logger.bind(module="database")
 

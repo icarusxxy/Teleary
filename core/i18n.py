@@ -6,7 +6,7 @@ from loguru import logger
 
 log = logger.bind(module="i18n")
 
-LOCALE_DIR = Path(__file__).parent / "locale"
+LOCALE_DIR = Path(__file__).parent.parent / "locale"
 DEFAULT_LANG = "eng"
 
 _translations: dict[str, dict[str, str]] = {}

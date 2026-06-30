@@ -8,8 +8,8 @@ from telegram.ext import (
     filters,
 )
 
-from config import BOT_TOKEN
-import database as db
+from core.config import BOT_TOKEN
+import core.database as db
 
 log = logger.bind(module="bot")
 
@@ -77,7 +77,7 @@ from handlers import (
     EMOJI_EDIT,
     LANGUAGE_SELECT,
 )
-from scheduler import init_scheduler
+from core.scheduler import init_scheduler
 
 
 # Lifecycle hooks: post_init opens the DB and starts the scheduler after the

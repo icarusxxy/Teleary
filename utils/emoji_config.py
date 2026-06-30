@@ -2,8 +2,8 @@ import json
 import time
 from loguru import logger
 
-import database as db
-from i18n import get_text
+import core.database as db
+from core.i18n import get_text
 
 log = logger.bind(module="emoji_config")
 
@@ -65,9 +65,16 @@ async def _load_moods() -> list[dict] | None:
 
 
 async def _resolve_label(item: dict, lang: str) -> str:
-    """Resolve display label: i18n key for default emojis, stored label for custom ones."""
+    """Resolve display label: i18n key for default emojis, stored label for custom ones.
+
+    For default emojis (in MOOD_KEYS), uses i18n translation unless the stored label
+    has been customized by the user (differs from the original default label), in which
+    case the user-provided label is used.
+    """
     if item["emoji"] in MOOD_KEYS:
-        return await get_text(MOOD_KEYS[item["emoji"]], lang)
+        default = next((d for d in DEFAULT_MOODS if d["emoji"] == item["emoji"]), None)
+        if default is None or item["label"] == default["label"]:
+            return await get_text(MOOD_KEYS[item["emoji"]], lang)
     return item["label"]
 
 
@@ -99,6 +106,18 @@ async def get_moods_full(lang: str = "eng") -> list[dict]:
     for item in items:
         result.append({"emoji": item["emoji"], "label": await _resolve_label(item, lang)})
     return result
+
+
+async def get_raw_moods() -> list[dict]:
+    """Return the raw mood list from DB without label resolution.
+
+    Use this for read-modify-write CRUD operations (add/edit/remove) to
+    avoid overwriting stored labels with i18n-resolved translations.
+    """
+    items = await _load_moods()
+    if items is None:
+        items = DEFAULT_MOODS
+    return [dict(item) for item in items]  # shallow-copy each dict
 
 
 async def set_moods(moods: list[dict]):

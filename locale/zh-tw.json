@@ -50,7 +50,7 @@
     "del_deleted": "✓ 日記已刪除！",
 
     "import_usage": "使用方法：/import YYYY-MM-DD [HHMM]\n接受 YYYY-MM-DD, YYYY/MM/DD, 或 YYYYMMDD。\n可後面附上時間：HHMM, HH:MM, HHMMSS, 或 HH:MM:SS。\n發送後再開始記錄日記內文。",
-    "import_invalid_date": "日期格式錯誤。請使用 YYYY, YYYY-MM, 或 YYYY-MM-DD",
+    "import_invalid_date": "日期格式錯誤。請使用 YYYYMMDD, YYYY/MM/DD, 或 YYYY-MM-DD",
     "import_invalid_time": "時間格式錯誤。请使用 HHMM(SS) 或 HH:MM(:SS)。",
     "import_send_text": "發送日記內容（或 /cancel 以取消）：",
     "import_pick_mood": "請選擇心情：",

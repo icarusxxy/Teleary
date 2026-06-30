@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 from re import fullmatch
-from utils import parse_date, get_now
+from utils.utils import parse_date, get_now
 
 
 def validate_date_input(date_str: str) -> tuple[bool, str]:

@@ -6,15 +6,14 @@ from apscheduler.triggers.interval import IntervalTrigger
 from zoneinfo import ZoneInfo
 
 from loguru import logger
-from config import TIMEZONE, get_reminder_pool
-import database as db
-from utils import get_now
+from core.config import TIMEZONE, get_reminder_pool
+import core.database as db
+from utils.utils import get_now
+import bot_state
 
 log = logger.bind(module="scheduler")
 
 scheduler = AsyncIOScheduler(timezone=ZoneInfo(TIMEZONE))
-_bot = None
-_chat_id = None
 
 
 def init_scheduler(bot, chat_id: int | None):
@@ -27,9 +26,9 @@ def init_scheduler(bot, chat_id: int | None):
        at the user's configured memory_time. This avoids needing a precise
        cron expression for an arbitrary HH:MM.
     """
-    global _bot, _chat_id
-    _bot = bot
-    _chat_id = chat_id
+    bot_state.set_bot(bot)
+    if chat_id is not None:
+        bot_state.set_chat_id(chat_id)
 
     scheduler.add_job(
         _random_reminder,
@@ -49,13 +48,10 @@ def init_scheduler(bot, chat_id: int | None):
     log.info("scheduler_started chat_id={}", chat_id)
 
 
-def set_chat_id(chat_id: int):
-    global _chat_id
-    _chat_id = chat_id
-
-
 async def _random_reminder():
-    if not _bot or not _chat_id:
+    bot = bot_state.get_bot()
+    chat_id = bot_state.get_chat_id()
+    if not bot or not chat_id:
         return
 
     now = get_now()
@@ -87,7 +83,7 @@ async def _random_reminder():
             lang = settings.get("language") or "eng"
             reminder_pool = await get_reminder_pool(lang)
             msg = random.choice(reminder_pool)
-            await _bot.send_message(chat_id=_chat_id, text=msg)
+            await bot.send_message(chat_id=chat_id, text=msg)
             await db.set_setting("last_reminder_sent", now.isoformat())
             log.info("reminder_sent hour={} message='{}'", now.hour, msg[:40])
         else:
@@ -97,7 +93,9 @@ async def _random_reminder():
 
 
 async def _daily_memory():
-    if not _bot or not _chat_id:
+    bot = bot_state.get_bot()
+    chat_id = bot_state.get_chat_id()
+    if not bot or not chat_id:
         return
 
     now = get_now()
@@ -108,6 +106,6 @@ async def _daily_memory():
         return
 
     log.info("memory_fired hour={}", now.hour)
-    from handlers import send_memories
+    from handlers.memory import send_memories
 
-    await send_memories(_bot, _chat_id)
+    await send_memories(bot, chat_id)

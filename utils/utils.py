@@ -2,9 +2,9 @@ from datetime import date, datetime
 from re import fullmatch
 from zoneinfo import ZoneInfo
 
-from config import TIMEZONE
-import emoji_config
-from i18n import get_text
+from core.config import TIMEZONE
+import utils.emoji_config as emoji_config
+from core.i18n import get_text
 
 _UTC = ZoneInfo("UTC")
 _LOCAL_TZ = ZoneInfo(TIMEZONE)
