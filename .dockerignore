@@ -1,0 +1,59 @@
+# ── Git ────────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── Python artifacts ──────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ─────────────────────────────────────────────────
+.venv/
+venv/
+ENV/
+
+# ── IDE / Editor ─────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Environment & secrets ────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Database (mounted as volume, not baked into image) ───────────────────
+data/
+
+# ── Testing & coverage ───────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# ── Type checking ────────────────────────────────────────────────────────
+.mypy_cache/
+
+# ── Linting ──────────────────────────────────────────────────────────────
+.ruff_cache/
+
+# ── Docker ───────────────────────────────────────────────────────────────
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# ── Documentation ────────────────────────────────────────────────────────
+*.md
+LICENSE
+
+# ── Project-specific ─────────────────────────────────────────────────────
+.todo

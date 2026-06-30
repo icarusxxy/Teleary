@@ -1,0 +1,35 @@
+services:
+  teleary:
+    build: .
+    container_name: teleary
+    restart: unless-stopped
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - TIMEZONE=${TIMEZONE:-Asia/Taipei}
+      - TZ=${TIMEZONE:-Asia/Taipei}
+      - DB_PATH=${DB_PATH:-data/diary.db}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      # Persist SQLite database outside the container
+      - bot-data:/app/data
+    # Resource limits for production safety
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+        reservations:
+          memory: 64M
+          cpus: "0.1"
+    # Graceful shutdown
+    stop_grace_period: 30s
+    # Logging configuration
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  bot-data:
+    driver: local
