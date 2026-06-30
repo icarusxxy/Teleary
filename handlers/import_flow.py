@@ -111,6 +111,9 @@ async def import_media_receive(update: Update, context: ContextTypes.DEFAULT_TYP
             _media_group_locks[group_id] = True
             task = asyncio.create_task(_process_import_group())
             task.add_done_callback(lambda t: log.error("import_media_group_task_failed group_id={} error={}", group_id, t.exception()) if t.exception() else None)
+        # Stay in IMPORT_DATE so subsequent album items are still handled here
+        # (rather than falling through to entry_conv which would get stuck).
+        return IMPORT_DATE
     else:
         context.user_data["import_text"] = msg.caption or ""
         context.user_data["import_message_id"] = msg.message_id

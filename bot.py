@@ -185,6 +185,10 @@ def main():
                     (filters.PHOTO | filters.VIDEO | filters.ANIMATION | filters.VOICE | filters.VIDEO_NOTE | filters.AUDIO) & ~filters.COMMAND,
                     import_media_receive,
                 ),
+                # Media groups stay in IMPORT_DATE until all items are buffered,
+                # so the mood callback must also be accepted in this state.
+                CallbackQueryHandler(import_mood_callback, pattern=r"^imood:"),
+                cancel_cb,
             ],
             IMPORT_MOOD: [
                 CallbackQueryHandler(import_mood_callback, pattern=r"^imood:"),
