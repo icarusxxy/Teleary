@@ -12,15 +12,6 @@ services:
     volumes:
       # Persist SQLite database outside the container
       - bot-data:/app/data
-    # Resource limits for production safety
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.5"
-        reservations:
-          memory: 64M
-          cpus: "0.1"
     # Graceful shutdown
     stop_grace_period: 30s
     # Logging configuration

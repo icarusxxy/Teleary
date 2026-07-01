@@ -138,8 +138,7 @@ async def import_mood_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     target_dt = context.user_data["import_date"]
     text = context.user_data.get("import_text", "")
 
-    # Convert local time to UTC for storage. SQLite stores timestamps without
-    # timezone info, so we normalize to UTC before inserting.
+    # Convert local time to UTC for storage. SQLite stores timestamps without timezone info, normalize to UTC before inserting.
     dt_utc = target_dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
 
     log.debug("import_saving user_id={} target_dt={} dt_utc={}", update.effective_user.id, target_dt, dt_utc)

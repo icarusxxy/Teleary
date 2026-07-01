@@ -73,9 +73,9 @@ async def get_text(key: str, lang: str = DEFAULT_LANG, **kwargs) -> str:
 async def get_lang_for_user(user_lang_code: str | None) -> str:
     """Map a Telegram user's language_code to an available locale.
 
-    Telegram sends codes like "zh-TW" or "en-US". We try exact match first,
+    Telegram sends codes like "zh-TW" or "en-US". Try exact match first,
     then the base language ("zh" from "zh-TW"), then fall back to English.
-    This handles cases where a user's language is a dialect we don't support.
+    This handles cases where a user's language is a dialect that are not supported.
     """
     await _load_translations()
 

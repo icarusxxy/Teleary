@@ -37,7 +37,7 @@ ENV PYTHONUNBUFFERED=1 \
 VOLUME ["/app/data"]
 
 # Health check: verify the Python process is running
-# Telegram bots don't expose HTTP ports, so we check the PID file written by bot.py
+# Telegram bots don't expose HTTP ports, only check the PID file written by bot.py
 # The start-period gives the bot time to initialize and write the PID file
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import os; f=open('/app/data/.pid'); pid=int(f.read().strip()); f.close(); os.kill(pid, 0)" || exit 1

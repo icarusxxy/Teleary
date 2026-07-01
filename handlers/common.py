@@ -19,7 +19,7 @@ log = logger.bind(module="handlers.common")
 
 # Global state for media group (album) buffering.
 # Telegram sends album items as separate messages with the same media_group_id.
-# We buffer them with a 1.5s delay to collect all items before processing.
+# Buffer them with a 1.5s delay to collect all items before processing.
 _media_group_buffers: dict[str, list] = {}
 _media_group_locks: dict[str, bool] = {}
 
@@ -78,8 +78,8 @@ async def handle_media_group(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """Buffer media group (album) messages and process them as a single entry.
 
     Telegram sends album items as separate messages, each with the same
-    media_group_id. We can't know how many items are in the album until they
-    all arrive, so we buffer for 1.5s and process the group as one entry.
+    media_group_id. Don't know how many items are in the album until they
+    all arrive, so buffer each for 1.5s and process the group as one entry.
     The lock prevents duplicate processing if multiple items arrive rapidly.
     """
     msg = update.message

@@ -7,8 +7,10 @@ from telegram.ext import (
     MessageHandler,
     CallbackQueryHandler,
     ConversationHandler,
+    ContextTypes,
     filters,
 )
+from telegram.error import NetworkError, TelegramError
 
 from core.config import BOT_TOKEN, DB_PATH
 import core.database as db
@@ -17,6 +19,18 @@ log = logger.bind(module="bot")
 
 # PID file for Docker health checks
 PID_FILE = Path(DB_PATH).parent / ".pid"
+
+
+# ---------- Error handler --------------------------------------------------
+# Catches transient Telegram API errors (e.g. 502 Bad Gateway) that occur during polling or API calls.
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log exceptions raised by handlers or the polling loop."""
+    if isinstance(context.error, NetworkError):
+        log.warning("Transient network error (will retry): {}", context.error)
+    elif isinstance(context.error, TelegramError):
+        log.error("Telegram API error: {}", context.error)
+    else:
+        log.exception("Unhandled exception in handler", exc_info=context.error)
 
 # Handler imports are grouped by feature. Each handler function is imported
 # individually because ConversationHandler states reference specific callbacks —
@@ -118,6 +132,10 @@ def main():
     
     app = Application.builder().token(BOT_TOKEN).build()
 
+    # Register the error handler so transient errors are logged cleanly
+    # instead of producing a full traceback.
+    app.add_error_handler(error_handler)
+
     # Shared cancel button handler — reused across all conversation flows.
     # Pattern anchored with ^ and $ to avoid matching substrings like "cancel_something".
     cancel_cb = CallbackQueryHandler(cancel, pattern=r"^cancel$")
@@ -127,7 +145,7 @@ def main():
     # 2. User taps mood emoji → mood_callback → END (entry saved)
     #
     # Media groups (albums) arrive as multiple messages with the same media_group_id.
-    # We buffer them with a 1.5s delay to collect all items before prompting for mood.
+    # Buffer them with a 1.5s delay to collect all items before prompting for mood.
     entry_conv = ConversationHandler(
         entry_points=[
             MessageHandler(

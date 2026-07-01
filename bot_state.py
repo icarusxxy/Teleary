@@ -2,7 +2,7 @@
 Shared bot state module.
 
 This module holds shared state that is used by both handlers and scheduler.
-By centralizing this state here, we avoid circular imports between modules.
+By centralizing this state here to avoid circular imports between modules.
 """
 
 # Global bot instance and chat_id

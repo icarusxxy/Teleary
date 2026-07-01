@@ -103,7 +103,7 @@ def db_to_local(utc_str: str) -> datetime:
     """Convert a UTC timestamp string from the database to the configured timezone.
 
     IMPORTANT: SQLite stores timestamps as plain strings without timezone info.
-    We assume they're UTC (the convention used when inserting via import),
+    Assume they're UTC (the convention used when inserting via import),
     then convert to the user's configured timezone for display.
     """
     return datetime.fromisoformat(utc_str).replace(tzinfo=_UTC).astimezone(_LOCAL_TZ)
