@@ -58,8 +58,8 @@
     "import_imported": "✓ 成功匯入！{mood} {label}{media} — {datetime}",
 
     "settings_title": "⚙️ 設定\n\n請選擇要更改的項目：",
-    "settings_remind_window": "提醒時段：{start}:00 – {end}:00",
-    "settings_memory_time": "回顧記憶時間：{time}",
+    "settings_remind_window": "🔔 提醒時段：{start}:00 – {end}:00",
+    "settings_memory_time": "📆 回顧記憶時間：{time}",
     "settings_emojis": "😊 心情",
     "settings_language": "🌐 語言",
     "settings_remind_prompt": "設定發送紀錄提醒的時間區間(24 小時制)，用空格分隔。\n範例：9 21（表示上午 9:00 到晚上 9:00）\n(以你的時區) (0-23)。\n\n 或 /cancel 以取消。",

@@ -96,15 +96,14 @@ async def get_available_langs() -> list[str]:
 
 def get_lang_name(lang_code: str) -> str:
     names = {
-        "eng": "English",
-        "zh-tw": "正體中文",
-        "ja": "日本語",
-        "ko": "한국어",
-        "es": "Español",
-        "fr": "Français",
-        "de": "Deutsch",
-        "ru": "Русский",
-        "pt": "Português",
-        "ar": "العربية",
+        "eng": "🇺🇸 English",
+        "zh-tw": "🇹🇼 正體中文",
+        "ja": "🇯🇵 日本語",
+        "ko": "🇰🇷 한국어",
+        "es": "🇪🇸 Español",
+        "fr": "🇫🇷 Français",
+        "de": "🇩🇪 Deutsch",
+        "ru": "🇷🇺 Русский",
+        "pt": "🇵🇹 Português",
     }
     return names.get(lang_code, lang_code.upper())

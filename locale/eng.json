@@ -58,8 +58,8 @@
     "import_imported": "✓ Imported! {mood} {label}{media} — {datetime}",
 
     "settings_title": "⚙️ Settings\n\nTap to change:",
-    "settings_remind_window": "Remind window: {start}:00 – {end}:00",
-    "settings_memory_time": "Memory time: {time}",
+    "settings_remind_window": "🔔 Remind window: {start}:00 – {end}:00",
+    "settings_memory_time": "📆 Memory time: {time}",
     "settings_emojis": "😊 Mood",
     "settings_language": "🌐 Language",
     "settings_remind_prompt": "Send reminder start and end hours, separated by a space.\nExample: 9 21 (means 9:00 AM to 9:00 PM)\nHours are in your timezone (0-23).\n\n/cancel to abort.",

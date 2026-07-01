@@ -1,7 +1,6 @@
 services:
   teleary:
     build: .
-    container_name: teleary
     restart: unless-stopped
     environment:
       - BOT_TOKEN=${BOT_TOKEN}

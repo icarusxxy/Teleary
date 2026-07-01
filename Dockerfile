@@ -25,6 +25,9 @@ COPY . .
 # Create data directory with correct ownership
 RUN mkdir -p /app/data && chown -R botuser:botuser /app
 
+# Set alias
+RUN echo 'alias ll="ls -la"' >> ~/.bashrc
+
 # Switch to non-root user
 USER botuser
 
